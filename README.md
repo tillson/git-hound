@@ -4,6 +4,8 @@ A pattern-matching, batch-catching secret snatcher.
 
 ![Git Hound](assets/logo.png)
 
+Git Hound makes it easy to find exposed APi keys on GitHub using pattern matching, targetted querying, and a scoring system.
+
 ## Usage
 
 `echo "tillsongalloway.com" | python git-hound.oy` or `python git-hound.py --subdomain-file subdomains.txt`
