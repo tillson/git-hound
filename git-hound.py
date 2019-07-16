@@ -150,10 +150,11 @@ def search_code(query, sessions, language=None):
 def regex_array(array):
   regex = r"("
   for elm in array:
-    elm = elm.replace("\\\\", "\\")
+    if elm == "":
+      continue
     regex += elm + r"|"
     if '.*' in elm:
-      print(bcolors.WARNING + "[!] The regex wildcard match .* is slow and may slow down Git Hound." + bcolors.ENDC)
+      print(bcolors.WARNING + "[!] The regex wildcard match .* can be slow if used improperly and may slow down Git Hound." + bcolors.ENDC)
   regex = regex[:-1] + r")"
   return re.compile(regex)
 
@@ -247,7 +248,11 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         output_file.write('https://github.com/' + path + "\n")
       for match in match_set:
         match_str = match[0] if len(match[0]) > 1 else match
+        if type(match_str) != str:
+            match_str = ''.join(match_str[0])
         truncated = match_str
+        if len(match_str) == 0:
+          continue
         if len(match_str) > 35:
           truncated = match_str[0][:35]
         if not args.silent:
