@@ -6,7 +6,7 @@ A pattern-matching, batch-catching secret snatcher.
 
 ## Usage
 
-`echo "tillsongalloway.com" | python git-hound.oy` or `python git-hound.py --subdomain-file subdomains.txt`
+`echo "tillsongalloway.com" | python git-hound.py` or `python git-hound.py --subdomain-file subdomains.txt`
 We also offer a number of flags to target specific patterns (known service API keys), file names (.htpasswd, .env), and languages (python, javascript).
 
 ### Flags
@@ -26,6 +26,7 @@ We also offer a number of flags to target specific patterns (known service API k
 
 ## Setup
 
-
-
-Thanks for reading!
+1. Clone this repo
+2. Use a Python 3 environment (recommended: virtulenv or [Conda](https://docs.conda.io/en/latest/))
+3. `pip install -r requirements.txt` (or `pip3`)
+4. `echo "tillsongalloway.com" | python git-hound.py`
