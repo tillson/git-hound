@@ -2,7 +2,7 @@
 A pattern-matching, batch-catching secret snatcher.
 **For educational use only.**
 
-![Git Hound][assets/logo.png]
+![Git Hound](assets/logo.png)
 
 ## Usage
 
