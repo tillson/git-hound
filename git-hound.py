@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(
     description='Git Hound')
 parser.add_argument(
   '--subdomain-file', type=str,
-  help='The file with the subdomains.')
+  help='The file with the subdomains (or other queries).')
 parser.add_argument(
     '--output',
     help='The output file.')
@@ -36,11 +36,11 @@ parser.add_argument(
     '--regex-file',
     help='Supply your own regex list')
 parser.add_argument(
-    '--file-types',
-    help='Supply your own list of file types to check')
+    '--search-files',
+    help='Supply your own list of files to check (*.env, .htpasswd)')
 parser.add_argument(
     '--language-file',
-    help='Supply your own list of file types to check')
+    help='Supply your own list of file types to check (java, python)')
 parser.add_argument(
     '--config-file',
     help='Custom config file location (default is config.yml)')
@@ -283,7 +283,7 @@ else:
     subdomain_file = args.subdomain_file
     subdomains = open(subdomain_file).read().split("\n")
 if len(subdomains) == 0:
-  print(bcolors.FAIL + "[!] Please specify a subdomain file." + bcolors.ENDC)
+  print(bcolors.FAIL + "[!] Please specify some queries (either with stdin or the --subdomain-file flag)." + bcolors.ENDC)
   exit(1)
 
 regex_string = None
@@ -292,8 +292,8 @@ if args.regex_file:
   regex_string = regex_array(regex_file_array)
 
 files = []
-if args.file_types:
-  ext_filetypes = open(args.file_types).read().split("\n")
+if args.search_files:
+  ext_filetypes = open(args.search_files).read().split("\n")
   for filetype in ext_filetypes:
     files.append(filetype)
 else:
