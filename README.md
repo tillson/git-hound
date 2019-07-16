@@ -13,7 +13,7 @@ We also offer a number of flags to target specific patterns (known service API k
 
 ### Flags
 
-* `--subdomain-file` - The file with the subdomains
+* `--subdomain-file` - The file with a list of queries (subdomains)
 * `--output` - The output file (default is stdout)
 * `--output-type` - The output type (requires output flag to be set; default is flatfile)
 * `--all` - Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.
