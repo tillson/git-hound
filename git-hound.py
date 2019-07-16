@@ -264,7 +264,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
       if output_file != None:
         output_file.write('https://github.com/' + path + "\n")
   if args.output and args.output_type == "json":
-    out_file = open('git-hound-output-int.json', 'w+')
+    out_file = open(args.output, 'w+')
     out_file.write(json.dumps(interesting))
     out_file.close()
 
