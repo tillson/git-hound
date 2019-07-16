@@ -11,7 +11,6 @@ import argparse
 import entropy
 import fileinput
 
-
 parser = argparse.ArgumentParser(
     description='Git Hound')
 parser.add_argument(
@@ -20,9 +19,9 @@ parser.add_argument(
 parser.add_argument(
     '--output',
     help='The output file.')
-# parser.add_argument(
-#     '--output-type', default=sys.stdout, type=argparse.FileType('w'),
-#     help='The output type. [stdout, json, sqlite]')
+parser.add_argument(
+    '--output-type', type=str,
+    help='The output type. [default, json]')
 parser.add_argument(
     '--all', default=False,
     type=bool,

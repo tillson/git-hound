@@ -12,6 +12,7 @@ A pattern-matching, batch-catching secret snatcher.
 
 * `--subdomain-file` - The file with the subdomains
 * `--output` - The output file (default is stdout)
+* `--output-type` - The output type (requires output flag to be set; default is flatfile)
 * `--all` - Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.
 * `--regex-file` - Supply a custom regex file
 * `--api-keys` - Enable generic API key searching. This uses common API key patterns and Shannon entropy to find potential exposed API keys.
