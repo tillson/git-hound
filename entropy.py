@@ -2,7 +2,7 @@ import math
 
 def entropy(string):
   table = {}
-  inverse = 1 / string.length
+  inverse = 1 / len(string)
   for character in string:
     table[character] = (table[character] if table[character] else 0) + inverse
 
