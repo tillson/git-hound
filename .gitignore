@@ -1,0 +1,4 @@
+config.yml
+.vscode/
+git-hound-output*
+__pycache__/
