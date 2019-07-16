@@ -23,12 +23,14 @@ parser.add_argument(
     '--output-type', type=str,
     help='The output type. [default, json]')
 parser.add_argument(
-    '--all', default=False,
-    type=bool,
+    '--all',
+    default=False,
+    action='store_true',
     help='Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.')
 parser.add_argument(
-    '--api-keys', default=True,
-    type=bool,
+    '--api-keys',
+    default=True,
+    action='store_true',
     help='Search for API keys')
 parser.add_argument(
     '--regex-file',
@@ -48,18 +50,18 @@ parser.add_argument(
     help='Max number of pages to search.')
 parser.add_argument(
     '--silent',
-    type=bool,
+    action='store_true',
     default=False,
     help='Don\'t print results to stdout (most reasonably used with --output).')
 parser.add_argument(
     '--no-antikeywords',
-    type=bool,
+    action='store_true',
     default=False,
     help='Don\'t attempt to filter out known mass scan databases')
 parser.add_argument(
     '--only-filtered',
-    type=bool,
     default=False,
+    action='store_true',
     help='Only search filtered queries (languages and files)')
 
 args = parser.parse_args()

@@ -7,6 +7,7 @@ A pattern-matching, batch-catching secret snatcher.
 ## Usage
 
 `echo "tillsongalloway.com" | python git-hound.oy` or `python git-hound.py --subdomain-file subdomains.txt`
+We also offer a number of flags to target specific patterns (known service API keys), file names (.htpasswd, .env), and languages (python, javascript).
 
 ### Flags
 
@@ -22,6 +23,9 @@ A pattern-matching, batch-catching secret snatcher.
 * `--silent` - Don't print results to stdout (most reasonably used with --output).
 * `--no-antikeywords` - Don't attempt to filter out known mass scans
 * `--only-filtered` - Only search filtered queries (languages, file extensions)
+
+## Setup
+
 
 
 Thanks for reading!
