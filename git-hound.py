@@ -66,7 +66,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-
 with open((args.config_file if args.config_file else "config.yml"), 'r') as ymlfile:
     config = yaml.load(ymlfile, Loader=yaml.SafeLoader)
 
@@ -92,7 +91,6 @@ def grab_csrf_token(url, session):
 
 def login_to_github(session):
   csrf = grab_csrf_token('https://github.com/login', session)
-  # print(GH_USER)
   response = session.post('https://github.com/session',
    data = {
      'authenticity_token': csrf,
@@ -100,19 +98,6 @@ def login_to_github(session):
      'password': GH_PASSWORD
    }
   )
-
-def parse_match(match, body):
-  print(match)
-  s_offset = match.span(0) - 100 if match.span(0) > 100 else match.span(0)
-  e_offset = match.span(0) + 100 if match.span(1) + 100 < len(body) else match.span(1)
-  context = body[s_offset:e_offset]
-  result = {
-    'start': match.span()[0],
-    'end': match.span()[1],
-    'context': context,
-    'text': match[0]
-  }
-  return result
 
 def search_code(query, sessions, language=None):
   query = urllib.parse.quote(query + " fork:false")
@@ -167,6 +152,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
   if len(paths) == 0:
     if not args.silent:
       print('No results.')
+  custom_regex = regex != None
   for path in paths:
     raw_path = path.replace('blob/', '').split('#')[0]
     if raw_path in visited:
@@ -174,15 +160,15 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     visited.add(raw_path)
     session = random.choice(sessions)
     response = session.get('https://raw.githubusercontent.com/' + raw_path)
+    print('https://raw.githubusercontent.com/' + raw_path)
     checksum = hashlib.md5(response.text.encode('utf-8'))
     if checksum in visited_hashes:
       continue
     visited_hashes.add(checksum)
     score = 0
     domain = '.'.join(subdomain.split(".")[-2:])
-
-    custom_regex = regex != None
     if not custom_regex:
+      print()
       regex = r"(sf_username|api_key" \
         + r"|(stage|staging)\." + re.escape(domain) + r"|db_username|db_password" \
         + r"|api_key_admin|x\-api\-key" \
@@ -190,7 +176,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")"
     matches = re.finditer(
       regex,
-      response.text.lower()
+      response.text.lower() if not custom_regex else response.text,
     )
     match_set = set()
     match_text_set = set()
@@ -200,15 +186,18 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
       if not match.group(0) in match_text_set:
         match_set.add(match.group(0))
         match_text_set.add(match.group(0))
-        score += 1
+        if custom_regex:
+          score += 2
+        else:
+          score += 1
 
     if args.api_keys:
-      generic_api_keys = re.finditer(r"("
-          + r"'[0-9A-z\_\-]{32}'|'[0-9A-z\_\-]{48}'|'[0-9A-z\_\-]{47}'"
-          + r"|\"[0-9A-z\_\-]{32}\"|\"[0-9A-z\_\-]{48}\"|\"[0-9A-z\_\-]{47}\""
+      generic_api_keys = re.finditer(re.compile(r"("
+          + r"'[0-9a-z\_\-]{32}'|'[0-9a-z\_\-]{48}'|'[0-9a-z\_\-]{47}'"
+          + r"|\"[0-9a-z\_\-]{32}\"|\"[0-9a-z\_\-]{48}\"|\"[0-9a-z\_\-]{47}\""
           + r"|\b[0-9a-z]{8}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{12}\b"
-          + r"|\b[0-9A-z]{40}\b"
-          + r"|\b[0-9a-z]{64}\b)",
+          + r"|\b[0-9a-z]{40}\b"
+          + r"|\b[0-9a-z]{64}\b)"),
           response.text.lower()
       )
       for match in generic_api_keys:
@@ -246,10 +235,11 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         output_file.write('https://github.com/' + path + "\n")
       for match in match_set:
         truncated = match
+        interesting[path]['results'].append(match)
         if len(match) == 0:
           continue
-        if len(match) > 40:
-          truncated = match[:40] + "..."
+        # if len(match) > 40:
+        #   truncated = match[:40] + "..."
         if not args.silent:
           print('  > ' + truncated)
         if output_file != None:
@@ -295,16 +285,12 @@ if args.search_files:
   ext_filetypes = open(args.search_files).read().split("\n")
   for filetype in ext_filetypes:
     files.append(filetype)
-else:
-  files = ['.git-credentials', '.bash_history', '*.sublime_session', '*.log', '.env']
 
 languages = []
 if args.language_file:
   ext_languages = open(args.language_file).read().split("\n")
   for filetype in ext_languages:
     languages.append(filetype)
-else:
-  languages = ['SQL', 'Jupyter+Notebook', 'Shell']
 
 sessions = []
 session = requests.Session()
