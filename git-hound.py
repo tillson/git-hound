@@ -188,22 +188,22 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         + r"|api_key_admin|x\-api\-key" \
         + r"|jenkins" \
         + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")"
-    matches = re.findall(
+    matches = re.finditer(
       regex,
       response.text.lower()
     )
     match_set = set()
     match_text_set = set()
     for match in matches:
-      if len(match) == 0:
+      if match.start(0) == match.end(0):
         continue
-      if not match[0] in match_text_set:
-        match_set.add(match)
-        match_text_set.add(match[0])
+      if not match.group(0) in match_text_set:
+        match_set.add(match.group(0))
+        match_text_set.add(match.group(0))
         score += 1
 
     if args.api_keys:
-      generic_api_keys = re.findall(r"("
+      generic_api_keys = re.finditer(r"("
           + r"'[0-9A-z\_\-]{32}'|'[0-9A-z\_\-]{48}'|'[0-9A-z\_\-]{47}'"
           + r"|\"[0-9A-z\_\-]{32}\"|\"[0-9A-z\_\-]{48}\"|\"[0-9A-z\_\-]{47}\""
           + r"|\b[0-9a-z]{8}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{12}\b"
@@ -211,14 +211,12 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
           + r"|\b[0-9a-z]{64}\b)",
           response.text.lower()
       )
-
-      if len(generic_api_keys) < 24:
-        for match in generic_api_keys:
-          if not match[0] in match_text_set:
-            if entropy.entropy(match[0]) > 4:
-              match_set.add(match)
-              match_text_set.add(match[0])
-              score += 2 if custom_regex else 1
+      for match in generic_api_keys:
+        if not match.group(0) in match_text_set:
+          if entropy.entropy(match.group(0)) > 4:
+            match_set.add(match.group(0))
+            match_text_set.add(match.group(0))
+            score += 2 if custom_regex else 1
 
     if not custom_regex:
       keywords = re.findall(r"(.sql|.sublime_session|.env|.yml|.ipynb)$", raw_path.lower())
@@ -233,7 +231,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         + r"|host\.txt|aquatone|recon\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\.txt)", raw_path.lower())
       if anti_keywords:
         score -= 2 ** len(anti_keywords)
-    if score > -5:
+    if score > 0:
       if score > 1:
         if not args.silent:
           print(bcolors.FAIL + 'https://github.com/' + path + bcolors.ENDC)
@@ -247,29 +245,25 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
       if output_file != None:
         output_file.write('https://github.com/' + path + "\n")
       for match in match_set:
-        match_str = match[0] if len(match[0]) > 1 else match
-        if type(match_str) != str:
-            match_str = ''.join(match_str[0])
-        truncated = match_str
-        if len(match_str) == 0:
+        truncated = match
+        if len(match) == 0:
           continue
-        if len(match_str) > 35:
-          truncated = match_str[0][:35]
+        if len(match) > 40:
+          truncated = match[:40] + "..."
         if not args.silent:
           print('  > ' + truncated)
         if output_file != None:
-          output_file.write('  > ' + match_str + "\n")
+          output_file.write('  > ' + match + "\n")
     else:
       if args.all:
         interesting[path] = {
           'url': 'https://github.com/' + path,
           'results': []
         }
-      if score > -1 or args.all:
         if not args.silent:
           print('https://github.com/' + path)
-      if output_file != None:
-        output_file.write('https://github.com/' + path + "\n")
+        if output_file != None:
+          output_file.write('https://github.com/' + path + "\n")
   if args.output and args.output_type == "json":
     out_file = open(args.output, 'w+')
     out_file.write(json.dumps(interesting))
