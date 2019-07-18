@@ -32,4 +32,5 @@ We also offer a number of flags to target specific patterns (known service API k
 1. Clone this repo
 2. Use a Python 3 environment (recommended: virtulenv or [Conda](https://docs.conda.io/en/latest/))
 3. `pip install -r requirements.txt` (or `pip3`)
-4. `echo "tillsongalloway.com" | python git-hound.py`
+4. Set up a `config.yml` file with GitHub credentials. See [config.example.yml](config.example.yml) for an example. Accounts with 2FA are not currently supported.
+5. `echo "tillsongalloway.com" | python git-hound.py`
