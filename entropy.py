@@ -10,6 +10,6 @@ def entropy(string):
 
   entropy = 0
   for character in string:
-    entropy += -table[character] + math.log2(table[character])
+    entropy += -table[character] * math.log2(table[character])
 
   return entropy

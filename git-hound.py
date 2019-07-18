@@ -29,7 +29,7 @@ parser.add_argument(
     help='Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.')
 parser.add_argument(
     '--api-keys',
-    default=True,
+    default=False,
     action='store_true',
     help='Search for API keys')
 parser.add_argument(
@@ -91,7 +91,7 @@ def grab_csrf_token(url, session):
 
 def login_to_github(session):
   csrf = grab_csrf_token('https://github.com/login', session)
-  response = session.post('https://github.com/session',
+  session.post('https://github.com/session',
    data = {
      'authenticity_token': csrf,
      'login': GH_USERNAME,
@@ -100,7 +100,7 @@ def login_to_github(session):
   )
 
 def search_code(query, sessions, language=None):
-  query = urllib.parse.quote(query + " fork:false")
+  query = urllib.parse.quote(query.replace("-", "+") + " fork:false")
 
   paths = set()
   delay_time = 5
@@ -160,7 +160,6 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     visited.add(raw_path)
     session = random.choice(sessions)
     response = session.get('https://raw.githubusercontent.com/' + raw_path)
-    print('https://raw.githubusercontent.com/' + raw_path)
     checksum = hashlib.md5(response.text.encode('utf-8'))
     if checksum in visited_hashes:
       continue
@@ -168,15 +167,16 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     score = 0
     domain = '.'.join(subdomain.split(".")[-2:])
     if not custom_regex:
-      print()
-      regex = r"(sf_username|api_key" \
-        + r"|(stage|staging)\." + re.escape(domain) + r"|db_username|db_password" \
-        + r"|api_key_admin|x\-api\-key" \
+      regex = re.compile(r"(sf_username" \
+        + r"|(stage|staging|atlassian|jira|conflence)\." + re.escape(domain) + r"|db_username|db_password" \
+        + r"|hooks\.slack\.com|pt_token" \
+        + r"|xox[a-zA-Z]-[a-zA-Z0-9-]+" \
         + r"|jenkins" \
-        + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")"
+        + r"|s3\.console\.aws\.amazon\.com\/s3\/buckets|" \
+        + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")", flags=re.IGNORECASE)
     matches = re.finditer(
       regex,
-      response.text.lower() if not custom_regex else response.text,
+      response.text
     )
     match_set = set()
     match_text_set = set()
@@ -192,20 +192,16 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
           score += 1
 
     if args.api_keys:
-      generic_api_keys = re.finditer(re.compile(r"("
-          + r"'[0-9a-z\_\-]{32}'|'[0-9a-z\_\-]{48}'|'[0-9a-z\_\-]{47}'"
-          + r"|\"[0-9a-z\_\-]{32}\"|\"[0-9a-z\_\-]{48}\"|\"[0-9a-z\_\-]{47}\""
-          + r"|\b[0-9a-z]{8}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{4}\-[0-9a-z]{12}\b"
-          + r"|\b[0-9a-z]{40}\b"
-          + r"|\b[0-9a-z]{64}\b)"),
-          response.text.lower()
+      generic_api_keys = re.finditer(
+        re.compile(r"(access|secret|license|crypt|pass|key|admin|token|pwd)[\w\s:=\"']{0,20}[=:\s]([\w\-+=]{32,})\b", flags=re.IGNORECASE),
+          response.text
       )
       for match in generic_api_keys:
-        if not match.group(0) in match_text_set:
-          if entropy.entropy(match.group(0)) > 4:
-            match_set.add(match.group(0))
-            match_text_set.add(match.group(0))
-            score += 2 if custom_regex else 1
+        if not match.group(2) in match_text_set:
+          if entropy.entropy(match.group(2)) > 3.25:
+            match_set.add(match.group(2))
+            match_text_set.add(match.group(2))
+            score += 2
 
     if not custom_regex:
       keywords = re.findall(r"(.sql|.sublime_session|.env|.yml|.ipynb)$", raw_path.lower())
@@ -238,14 +234,13 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         interesting[path]['results'].append(match)
         if len(match) == 0:
           continue
-        # if len(match) > 40:
-        #   truncated = match[:40] + "..."
         if not args.silent:
           print('  > ' + truncated)
         if output_file != None:
           output_file.write('  > ' + match + "\n")
     else:
       if args.all:
+        print('args.all')
         interesting[path] = {
           'url': 'https://github.com/' + path,
           'results': []
