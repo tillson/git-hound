@@ -240,7 +240,6 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
           output_file.write('  > ' + match + "\n")
     else:
       if args.all:
-        print('args.all')
         interesting[path] = {
           'url': 'https://github.com/' + path,
           'results': []
