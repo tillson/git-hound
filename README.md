@@ -26,6 +26,7 @@ We also offer a number of flags to target specific patterns (known service API k
 * `--silent` - Don't print results to stdout (most reasonably used with --output).
 * `--no-antikeywords` - Don't attempt to filter out known mass scans
 * `--only-filtered` - Only search filtered queries (languages, file extensions)
+* `--debug` - Print debug messages. Helpful for debugging slow expressions.
 
 ## Setup
 

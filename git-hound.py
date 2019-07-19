@@ -63,6 +63,12 @@ parser.add_argument(
     default=False,
     action='store_true',
     help='Only search filtered queries (languages and files)')
+parser.add_argument(
+    '--debug',
+    default=False,
+    action='store_true',
+    help='Print debug messages')
+
 
 args = parser.parse_args()
 
@@ -81,6 +87,9 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
+def debug_log(data):
+  print(bcolors.OKBLUE + '[debug] ' + bcolors.ENDC + data)
 
 def grab_csrf_token(url, session):
   response = session.get(url)
@@ -167,13 +176,16 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     score = 0
     domain = '.'.join(subdomain.split(".")[-2:])
     if not custom_regex:
-      regex = re.compile(r"(sf_username" \
+      regex = re.compile(r"\b(sf_username" \
         + r"|(stage|staging|atlassian|jira|conflence)\." + re.escape(domain) + r"|db_username|db_password" \
         + r"|hooks\.slack\.com|pt_token" \
         + r"|xox[a-zA-Z]-[a-zA-Z0-9-]+" \
-        + r"|jenkins" \
+        + r"|jenkins|Bearer" \
         + r"|s3\.console\.aws\.amazon\.com\/s3\/buckets|" \
-        + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")", flags=re.IGNORECASE)
+        + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")\b", flags=re.IGNORECASE)
+    s_time = 0
+    if args.debug:
+      s_time = time.time()
     matches = re.finditer(
       regex,
       response.text
@@ -190,10 +202,15 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
           score += 2
         else:
           score += 1
+    if args.debug:
+      debug_log('https://raw.githubusercontent.com/' + raw_path)
+      debug_log("Time to check definite regexes: " + str(time.time() - s_time) + ".")
 
     if args.api_keys:
+      if args.debug:
+        s_time = time.time()
       generic_api_keys = re.finditer(
-        re.compile(r"(access|secret|license|crypt|pass|key|admin|token|pwd)[\w\s:=\"']{0,20}[=:\s]([\w\-+=]{32,})\b", flags=re.IGNORECASE),
+        re.compile(r"(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\w\s:=\"']{0,20}[=:\s'\"]([\w\-+=]{32,})\b", flags=re.IGNORECASE),
           response.text
       )
       for match in generic_api_keys:
@@ -202,6 +219,8 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
             match_set.add(match.group(2))
             match_text_set.add(match.group(2))
             score += 2
+      if args.debug:
+        debug_log("Time to find API key regexes: " + str(time.time() - s_time) + ".")
 
     if not custom_regex:
       keywords = re.findall(r"(.sql|.sublime_session|.env|.yml|.ipynb)$", raw_path.lower())
@@ -212,7 +231,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
       if re.search(r"(\.html|\.csv|hosts\.txt|host\.txt|registry\.json|readme\.md|" + re.escape('.'.join(subdomain.split(".")[-2:])) + r".txt)$", raw_path.lower()):
         score -= 1
       anti_keywords = re.findall(r"(alexa|urls|adblock|domain|dns|top1000|top\-1000|httparchive"
-        + r"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|output|hosts\.txt"
+        + r"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\.txt"
         + r"|host\.txt|aquatone|recon\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\.txt)", raw_path.lower())
       if anti_keywords:
         score -= 2 ** len(anti_keywords)
