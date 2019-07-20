@@ -5,7 +5,7 @@ A pattern-matching, batch-catching secret snatcher.
 
 ![Git Hound](assets/logo.png)
 
-Git Hound makes it easy to find exposed APi keys on GitHub using pattern matching, targetted querying, and a scoring system.
+Git Hound makes it easy to find exposed APi keys on GitHub using pattern matching, targetted querying, and a scoring system. This differs from other OSINT GitHub scanners by searching keywords across GitHub rather than targetting specific organizations and its users ([GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically scans organizations).
 
 ## Usage
 
