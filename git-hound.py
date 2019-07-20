@@ -64,6 +64,11 @@ parser.add_argument(
     action='store_true',
     help='Only search filtered queries (languages and files)')
 parser.add_argument(
+    '--gist-only',
+    action='store_true',
+    default=False,
+    help='Only search Gists (default searches both repos and gists)')
+parser.add_argument(
     '--debug',
     default=False,
     action='store_true',
@@ -108,13 +113,17 @@ def login_to_github(session):
    }
   )
 
-def search_code(query, sessions, language=None):
+def search_code(query, sessions, language=None, fileName=None):
   query = urllib.parse.quote(query.replace("-", "+") + " fork:false")
-
-  paths = set()
+  if fileName != None:
+    query += " filename:" + fileName
+  paths = []
+  path_set = set()
   delay_time = 5
   maximum_pages = args.pages if args.pages else 50
   page = 1
+  if args.debug:
+    debug_log('Querying GitHub projects: `' + query + '`')
   while page < maximum_pages + 1:
     session = random.choice(sessions)
     url_string = 'https://github.com/search?o=asc&p=' + str(page) + '&q=' + query + '&s=indexed&type=Code'
@@ -129,17 +138,71 @@ def search_code(query, sessions, language=None):
     if delay_time > 10:
       delay_time -= 1
     page += 1
+    if args.debug and page % 20 == 0:
+      debug_log('  Page ' + str(page))
     if response.status_code != 200 and response.status_code != 400:
       break
     results = re.findall(r"href=\"\/.*blob.*\">", response.text)
     if len(results) == 0:
       break
     for result in results:
-      if re.match(r"(h1domains|bounty\-targets|url_short|url_list|\.csv|alexa)", result[7:len(result) - 2]):
+      result = result[7:len(result) - 2]
+      if result in path_set:
         continue
-      paths.add(result[7:len(result) - 2])
+      path_set.add(result)
+      if re.match(r"(h1domains|bounty\-targets|url_short|url_list|\.csv|alexa)", result):
+        continue
+      raw_path = result.replace('blob/', '').split('#')[0]
+      paths.append({ 'source': 'github_repo', 'url': 'https://github.com/' + result, 'data_url': 'https://raw.githubusercontent.com/' + raw_path })
     time.sleep(delay_time)
   return paths
+
+def search_gist(query, sessions, language=None, fileName=None):
+  query = urllib.parse.quote(query.replace("-", "+") + " stars:<5 fork:false")
+  if fileName != None:
+    query += " filename:" + fileName
+  paths = []
+  delay_time = 5
+  maximum_pages = args.pages if args.pages else 50
+  page = 1
+  if args.debug:
+    debug_log('Querying Gist: `' + query + '`')
+  while page < maximum_pages + 1:
+    session = random.choice(sessions)
+    url_string = 'https://gist.github.com/search?o=asc&p=' + str(page) + '&q=' + query + '&s=indexed'
+    if args.debug and page % 20 == 0:
+      debug_log(url_string + ' - page ' + str(page))
+    if language:
+      url_string += '&l=' + language
+    response = session.get(url_string)
+    if response.status_code == 429:
+      delay_time += 5
+      print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
+      time.sleep(delay_time)
+      continue
+    if delay_time > 10:
+      delay_time -= 1
+    page += 1
+    if response.status_code != 200 and response.status_code != 400:
+      break
+    results = re.findall(r"href=\"\/(\w+\/[0-9a-z]{5,})\">", response.text)
+    if len(results) == 0:
+      break
+    result_set = set()
+    for result in results:
+      if result in result_set:
+        continue
+      result_set.add(result)
+      project_page = session.get('https://gist.github.com/' + result)
+      escaped_path = re.escape(result)
+      match = re.search(r"href\=\"(\/" + escaped_path + r"\/raw\/[0-9a-z]{40}\/[\w_\-\.\/\%]{1,255})\"\>", project_page.text)
+      if match != None:
+        paths.append({ 'source': 'gist', 'url': 'https://gist.github.com/' + result, 'data_url': 'https://gist.githubusercontent.com' + match.group(1) })
+      else:
+        print('none: ' + result)
+    time.sleep(delay_time)
+  return paths
+
 
 def regex_array(array):
   regex = r"("
@@ -162,13 +225,12 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     if not args.silent:
       print('No results.')
   custom_regex = regex != None
-  for path in paths:
-    raw_path = path.replace('blob/', '').split('#')[0]
-    if raw_path in visited:
+  for result in paths:
+    if result['data_url'] in visited:
       continue
-    visited.add(raw_path)
+    visited.add(result['data_url'])
     session = random.choice(sessions)
-    response = session.get('https://raw.githubusercontent.com/' + raw_path)
+    response = session.get(result['data_url'])
     checksum = hashlib.md5(response.text.encode('utf-8'))
     if checksum in visited_hashes:
       continue
@@ -177,10 +239,10 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
     domain = '.'.join(subdomain.split(".")[-2:])
     if not custom_regex:
       regex = re.compile(r"\b(sf_username" \
-        + r"|(stage|staging|atlassian|jira|conflence)\." + re.escape(domain) + r"|db_username|db_password" \
-        + r"|hooks\.slack\.com|pt_token" \
+        + r"|(stage|staging|atlassian|jira|conflence|zendesk)\." + re.escape(domain) + r"|db_username|db_password" \
+        + r"|hooks\.slack\.com|pt_token|full_resolution_time_in_minutes" \
         + r"|xox[a-zA-Z]-[a-zA-Z0-9-]+" \
-        + r"|jenkins|Bearer" \
+        + r"|Bearer" \
         + r"|s3\.console\.aws\.amazon\.com\/s3\/buckets|" \
         + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")\b", flags=re.IGNORECASE)
     s_time = 0
@@ -203,7 +265,7 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         else:
           score += 1
     if args.debug:
-      debug_log('https://raw.githubusercontent.com/' + raw_path)
+      debug_log(result['data_url'])
       debug_log("Time to check definite regexes: " + str(time.time() - s_time) + ".")
 
     if args.api_keys:
@@ -223,34 +285,34 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         debug_log("Time to find API key regexes: " + str(time.time() - s_time) + ".")
 
     if not custom_regex:
-      keywords = re.findall(r"(.sql|.sublime_session|.env|.yml|.ipynb)$", raw_path.lower())
+      keywords = re.findall(r"(.sql|.sublime_session|.env|.yml|.ipynb)$", result['data_url'].lower())
       if keywords:
         score += len(keywords) * 2
 
     if not args.no_antikeywords:
-      if re.search(r"(\.html|\.csv|hosts\.txt|host\.txt|registry\.json|readme\.md|" + re.escape('.'.join(subdomain.split(".")[-2:])) + r".txt)$", raw_path.lower()):
+      if re.search(r"(\.html|\.csv|hosts\.txt|host\.txt|registry\.json|readme\.md|" + re.escape('.'.join(subdomain.split(".")[-2:])) + r".txt)$", result['data_url'].lower()):
         score -= 1
       anti_keywords = re.findall(r"(alexa|urls|adblock|domain|dns|top1000|top\-1000|httparchive"
         + r"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\.txt"
-        + r"|host\.txt|aquatone|recon\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\.txt)", raw_path.lower())
+        + r"|host\.txt|aquatone|recon\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\.txt)", result['data_url'].lower())
       if anti_keywords:
         score -= 2 ** len(anti_keywords)
     if score > 0:
       if score > 1:
         if not args.silent:
-          print(bcolors.FAIL + 'https://github.com/' + path + bcolors.ENDC)
+          print(bcolors.FAIL + result['url'] + bcolors.ENDC)
       else:
         if not args.silent:
-          print(bcolors.WARNING + 'https://github.com/' + path + bcolors.ENDC)
-      interesting[path] = {
-        'url': 'https://github.com/' + path,
+          print(bcolors.WARNING + result['url'] + bcolors.ENDC)
+      interesting[result['url']] = {
+        'url': result['url'],
         'results': []
        }
       if output_file != None:
-        output_file.write('https://github.com/' + path + "\n")
+        output_file.write(result['url'] + "\n")
       for match in match_set:
         truncated = match
-        interesting[path]['results'].append(match)
+        interesting[result['url']]['results'].append(match)
         if len(match) == 0:
           continue
         if not args.silent:
@@ -259,14 +321,14 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
           output_file.write('  > ' + match + "\n")
     else:
       if args.all:
-        interesting[path] = {
-          'url': 'https://github.com/' + path,
+        interesting[result['url']] = {
+          'url': result['url'],
           'results': []
         }
         if not args.silent:
-          print('https://github.com/' + path)
+          print(result['url'])
         if output_file != None:
-          output_file.write('https://github.com/' + path + "\n")
+          output_file.write(result['url'] + "\n")
   if args.output and args.output_type == "json":
     out_file = open(args.output, 'w+')
     out_file.write(json.dumps(interesting))
@@ -316,16 +378,29 @@ if args.output and args.output_type != "json":
   output_file = open(args.output, 'w+')
 
 for subdomain in subdomains:
-  paths = set()
+  paths = []
+  # results = []
   for file_type in languages:
-    for path in search_code('"' + subdomain + '"', sessions, language=file_type):
-      paths.add(path)
+    if not args.gist_only:
+      for path in search_code('"' + subdomain + '"', sessions, language=file_type):
+        paths.append(path)
+    for path in search_gist('"' + subdomain + '"', sessions, language=file_type):
+      paths.append(path)
+
   if not args.only_filtered:
-    for path in search_code('"' + subdomain + '"', sessions):
-      paths.add(path)
+    if not args.gist_only:
+      for path in search_code('"' + subdomain + '"', sessions):
+        paths.append(path)
+    for path in search_gist('"' + subdomain + '"', sessions):
+      paths.append(path)
+
   for filename in files:
-    for path in search_code('filename:' + filename + ' "' + subdomain + '"', sessions):
-      paths.add(path)
+    for path in search_code('"' + subdomain + '"', sessions, fileName=filename):
+      paths.append(path)
+    for path in search_gist('"' + subdomain + '"', sessions, fileName=filename):
+      paths.append(path)
+  if args.debug:
+    debug_log('Finished scraping GitHub search results. Will now search for secrets in ' + str(len(paths)) + ' files.')
   print_paths_highlighted(subdomain, paths, sessions, output_file, regex=regex_string)
   time.sleep(5)
   if output_file != None:
