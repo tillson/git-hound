@@ -198,8 +198,6 @@ def search_gist(query, sessions, language=None, fileName=None):
       match = re.search(r"href\=\"(\/" + escaped_path + r"\/raw\/[0-9a-z]{40}\/[\w_\-\.\/\%]{1,255})\"\>", project_page.text)
       if match != None:
         paths.append({ 'source': 'gist', 'url': 'https://gist.github.com/' + result, 'data_url': 'https://gist.githubusercontent.com' + match.group(1) })
-      else:
-        print('none: ' + result)
     time.sleep(delay_time)
   return paths
 
