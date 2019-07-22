@@ -15,11 +15,12 @@ We also offer a number of flags to target specific patterns (known service API k
 ### Flags
 
 * `--subdomain-file` - The file with the subdomains
+* `--api-keys` - Enable generic API key searching. This uses common API key patterns and Shannon entropy to find potential exposed API keys.
 * `--output` - The output file (default is stdout)
 * `--output-type` - The output type (requires output flag to be set; default is flatfile)
+* `--many-results` - Use result sorting to scrape more than 100 pages of results
 * `--all` - Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.
 * `--regex-file` - Supply a custom regex file
-* `--api-keys` - Enable generic API key searching. This uses common API key patterns and Shannon entropy to find potential exposed API keys.
 * `--language-file` - Supply a custom file with languages to search.
 * `--config-file` - Custom config file (default is `config.yml`)
 * `--pages` - Max pages to search (default is 100, the page maximum)

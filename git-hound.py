@@ -69,7 +69,17 @@ parser.add_argument(
     default=False,
     help='Only search Gists (default searches both repos and gists)')
 parser.add_argument(
+    '--no-repeated-matches',
+    action='store_true',
+    default=False,
+    help='Don\'t print repeated matches')
+parser.add_argument(
     '--debug',
+    default=False,
+    action='store_true',
+    help='Print debug messages')
+parser.add_argument(
+    '--many-results',
     default=False,
     action='store_true',
     help='Print debug messages')
@@ -120,41 +130,68 @@ def search_code(query, sessions, language=None, fileName=None):
   paths = []
   path_set = set()
   delay_time = 5
-  maximum_pages = args.pages if args.pages else 50
+  maximum_pages = args.pages if args.pages else 100
   page = 1
   if args.debug:
     debug_log('Querying GitHub projects: `' + query + '`')
-  while page < maximum_pages + 1:
-    session = random.choice(sessions)
-    url_string = 'https://github.com/search?o=asc&p=' + str(page) + '&q=' + query + '&s=indexed&type=Code'
-    if language:
-      url_string += '&l=' + language
-    response = session.get(url_string)
-    if response.status_code == 429:
-      delay_time += 5
-      print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
-      time.sleep(delay_time)
-      continue
-    if delay_time > 10:
-      delay_time -= 1
-    page += 1
-    if args.debug and page % 20 == 0:
-      debug_log('  Page ' + str(page))
-    if response.status_code != 200 and response.status_code != 400:
-      break
-    results = re.findall(r"href=\"\/.*blob.*\">", response.text)
-    if len(results) == 0:
-      break
-    for result in results:
-      result = result[7:len(result) - 2]
-      if result in path_set:
+  order = ['asc']
+  order_index = 0
+  search_type = ['indexed']
+  search_type_index = 0
+  while search_type_index < len(search_type):
+    order_index = 0
+    while order_index < len(order):
+      if search_type[search_type_index] == '':
+        order_index += 1
         continue
-      path_set.add(result)
-      if re.match(r"(h1domains|bounty\-targets|url_short|url_list|\.csv|alexa)", result):
-        continue
-      raw_path = result.replace('blob/', '').split('#')[0]
-      paths.append({ 'source': 'github_repo', 'url': 'https://github.com/' + result, 'data_url': 'https://raw.githubusercontent.com/' + raw_path })
-    time.sleep(delay_time)
+      page = 0
+      while page < maximum_pages + 1:
+        session = random.choice(sessions)
+        url_string = 'https://github.com/search?o=' + order[order_index] \
+          + '&p=' + str(page) + '&q=' + query + '&s=' + search_type[search_type_index] + '&type=Code'
+        if language:
+          url_string += '&l=' + language
+        if args.debug:
+          debug_log(url_string)
+        response = session.get(url_string)
+        if response.status_code == 429:
+          delay_time += 5
+          print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
+          time.sleep(delay_time)
+          continue
+        if delay_time > 10:
+          delay_time -= 1
+        if page == 1 and order[order_index] == 'asc' and  search_type[search_type_index] == 'indexed':
+          match = re.search(r"\bdata\-total\-pages\=\"(\d+)\"", response.text)
+          if match != None:
+            if args.many_results and int(match.group(1)) > maximum_pages - 1:
+              print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + '+ pages of results...' + bcolors.ENDC)
+              order.append('desc')
+              search_type.append('')
+            else:
+              print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + ' pages of results...' + bcolors.ENDC)
+          else:
+            print(bcolors.OKBLUE + '[*] Searching 1 page of results...' + bcolors.ENDC)
+        page += 1
+        if args.debug and page % 20 == 0:
+          debug_log('  Page ' + str(page))
+        if response.status_code != 200 and response.status_code != 400:
+          break
+        results = re.findall(r"href=\"\/.*blob.*\">", response.text)
+        if len(results) == 0:
+          break
+        for result in results:
+          result = result[7:len(result) - 2]
+          if result in path_set:
+            continue
+          path_set.add(result)
+          if re.match(r"(h1domains|bounty\-targets|url_short|url_list|\.csv|alexa)", result):
+            continue
+          raw_path = result.replace('blob/', '').split('#')[0]
+          paths.append({ 'source': 'github_repo', 'url': 'https://github.com/' + result, 'data_url': 'https://raw.githubusercontent.com/' + raw_path })
+        time.sleep(delay_time)
+      order_index += 1
+    search_type_index += 1
   return paths
 
 def search_gist(query, sessions, language=None, fileName=None):
@@ -163,15 +200,15 @@ def search_gist(query, sessions, language=None, fileName=None):
     query += " filename:" + fileName
   paths = []
   delay_time = 5
-  maximum_pages = args.pages if args.pages else 50
+  maximum_pages = args.pages if args.pages else 100
   page = 1
-  if args.debug:
-    debug_log('Querying Gist: `' + query + '`')
   while page < maximum_pages + 1:
     session = random.choice(sessions)
     url_string = 'https://gist.github.com/search?o=asc&p=' + str(page) + '&q=' + query + '&s=indexed'
+    if args.debug:
+      debug_log('Querying Gist: `' + query + '`')
     if args.debug and page % 20 == 0:
-      debug_log(url_string + ' - page ' + str(page))
+      debug_log(' . Page ' + str(page))
     if language:
       url_string += '&l=' + language
     response = session.get(url_string)
@@ -198,8 +235,6 @@ def search_gist(query, sessions, language=None, fileName=None):
       match = re.search(r"href\=\"(\/" + escaped_path + r"\/raw\/[0-9a-z]{40}\/[\w_\-\.\/\%]{1,255})\"\>", project_page.text)
       if match != None:
         paths.append({ 'source': 'gist', 'url': 'https://gist.github.com/' + result, 'data_url': 'https://gist.githubusercontent.com' + match.group(1) })
-      else:
-        print('none: ' + result)
     time.sleep(delay_time)
   return paths
 
@@ -219,6 +254,7 @@ interesting = {}
 
 visited = set()
 visited_hashes = set()
+match_string_set = set()
 def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None):
   print(bcolors.OKGREEN + subdomain + bcolors.ENDC)
   if len(paths) == 0:
@@ -242,7 +278,6 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         + r"|(stage|staging|atlassian|jira|conflence|zendesk)\." + re.escape(domain) + r"|db_username|db_password" \
         + r"|hooks\.slack\.com|pt_token|full_resolution_time_in_minutes" \
         + r"|xox[a-zA-Z]-[a-zA-Z0-9-]+" \
-        + r"|Bearer" \
         + r"|s3\.console\.aws\.amazon\.com\/s3\/buckets|" \
         + r"|id_rsa|pg_pass|[\w\.=-]+@" + re.escape(domain) + r")\b", flags=re.IGNORECASE)
     s_time = 0
@@ -298,6 +333,15 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
       if anti_keywords:
         score -= 2 ** len(anti_keywords)
     if score > 0:
+      if args.no_repeated_matches:
+        unique_matches = len(match_set)
+        for match in match_set:
+          if match in match_string_set:
+            unique_matches -= 1
+          else:
+            match_string_set.add(match)
+        if unique_matches == 0:
+          continue
       if score > 1:
         if not args.silent:
           print(bcolors.FAIL + result['url'] + bcolors.ENDC)
@@ -380,25 +424,29 @@ if args.output and args.output_type != "json":
 for subdomain in subdomains:
   paths = []
   # results = []
-  for file_type in languages:
-    if not args.gist_only:
-      for path in search_code('"' + subdomain + '"', sessions, language=file_type):
-        paths.append(path)
-    for path in search_gist('"' + subdomain + '"', sessions, language=file_type):
-      paths.append(path)
 
+  github_results = 0
   if not args.only_filtered:
     if not args.gist_only:
       for path in search_code('"' + subdomain + '"', sessions):
         paths.append(path)
+      github_results = len(paths)
     for path in search_gist('"' + subdomain + '"', sessions):
       paths.append(path)
 
-  for filename in files:
-    for path in search_code('"' + subdomain + '"', sessions, fileName=filename):
-      paths.append(path)
-    for path in search_gist('"' + subdomain + '"', sessions, fileName=filename):
-      paths.append(path)
+    for file_type in languages:
+      if not args.gist_only:
+        for path in search_code('"' + subdomain + '"', sessions, language=file_type):
+          paths.append(path)
+      for path in search_gist('"' + subdomain + '"', sessions, language=file_type):
+        paths.append(path)
+
+
+    for filename in files:
+      for path in search_code('"' + subdomain + '"', sessions, fileName=filename):
+        paths.append(path)
+      for path in search_gist('"' + subdomain + '"', sessions, fileName=filename):
+        paths.append(path)
   if args.debug:
     debug_log('Finished scraping GitHub search results. Will now search for secrets in ' + str(len(paths)) + ' files.')
   print_paths_highlighted(subdomain, paths, sessions, output_file, regex=regex_string)
