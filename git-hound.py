@@ -45,6 +45,11 @@ parser.add_argument(
     '--config-file',
     help='Custom config file location (default is config.yml)')
 parser.add_argument(
+    '--results-only',
+    default=False,
+    action='store_true',
+    help='ONLY print the regexed search results in stdout (useful for piping to things)')
+parser.add_argument(
     '--pages',
     type=int,
     help='Max number of pages to search.')
@@ -156,7 +161,8 @@ def search_code(query, sessions, language=None, fileName=None):
         response = session.get(url_string)
         if response.status_code == 429:
           delay_time += 5
-          print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
+          if not args.results_only:
+            print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
           time.sleep(delay_time)
           continue
         if delay_time > 10:
@@ -165,13 +171,16 @@ def search_code(query, sessions, language=None, fileName=None):
           match = re.search(r"\bdata\-total\-pages\=\"(\d+)\"", response.text)
           if match != None:
             if args.many_results and int(match.group(1)) > maximum_pages - 1:
-              print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + '+ pages of results...' + bcolors.ENDC)
+              if not args.results_only:
+                print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + '+ pages of results...' + bcolors.ENDC)
               order.append('desc')
               search_type.append('')
             else:
-              print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + ' pages of results...' + bcolors.ENDC)
+              if not args.results_only:
+                print(bcolors.OKBLUE + '[*] Searching ' + str(match.group(1)) + ' pages of results...' + bcolors.ENDC)
           else:
-            print(bcolors.OKBLUE + '[*] Searching 1 page of results...' + bcolors.ENDC)
+            if not args.results_only:
+              print(bcolors.OKBLUE + '[*] Searching 1 page of results...' + bcolors.ENDC)
         page += 1
         if args.debug and page % 20 == 0:
           debug_log('  Page ' + str(page))
@@ -214,7 +223,8 @@ def search_gist(query, sessions, language=None, fileName=None):
     response = session.get(url_string)
     if response.status_code == 429:
       delay_time += 5
-      print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
+      if not args.results_only:
+        print(bcolors.WARNING + '[!] Rate limited by GitHub. Delaying ' + str(delay_time) + 's...' + bcolors.ENDC)
       time.sleep(delay_time)
       continue
     if delay_time > 10:
@@ -246,7 +256,8 @@ def regex_array(array):
       continue
     regex += elm + r"|"
     if '.*' in elm:
-      print(bcolors.WARNING + "[!] The regex wildcard match .* can be slow if used improperly and may slow down Git Hound." + bcolors.ENDC)
+      if not args.results_only:
+        print(bcolors.WARNING + "[!] The regex wildcard match .* can be slow if used improperly and may slow down Git Hound." + bcolors.ENDC)
   regex = regex[:-1] + r")"
   return re.compile(regex)
 
@@ -256,9 +267,10 @@ visited = set()
 visited_hashes = set()
 match_string_set = set()
 def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None):
-  print(bcolors.OKGREEN + subdomain + bcolors.ENDC)
+  if not args.results_only:
+    print(bcolors.OKGREEN + subdomain + bcolors.ENDC)
   if len(paths) == 0:
-    if not args.silent:
+    if not args.silent and not args.results_only:
       print('No results.')
   custom_regex = regex != None
   for result in paths:
@@ -343,10 +355,10 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         if unique_matches == 0:
           continue
       if score > 1:
-        if not args.silent:
+        if not args.silent and not args.results_only:
           print(bcolors.FAIL + result['url'] + bcolors.ENDC)
       else:
-        if not args.silent:
+        if not args.silent and not args.results_only:
           print(bcolors.WARNING + result['url'] + bcolors.ENDC)
       interesting[result['url']] = {
         'url': result['url'],
@@ -360,9 +372,14 @@ def print_paths_highlighted(subdomain, paths, sessions, output_file, regex=None)
         if len(match) == 0:
           continue
         if not args.silent:
-          print('  > ' + truncated)
-        if output_file != None:
-          output_file.write('  > ' + match + "\n")
+          if args.results_only:
+            print(truncated)
+            if output_file != None:
+              output_file.write(match + "\n")
+          else:
+            print('  > ' + truncated)
+            if output_file != None:
+              output_file.write('  > ' + match + "\n")
     else:
       if args.all:
         interesting[result['url']] = {
@@ -415,7 +432,8 @@ sessions = []
 session = requests.Session()
 login_to_github(session)
 sessions.append(session)
-print(bcolors.OKBLUE + '[*] Logged into GitHub.com as ' + GH_USERNAME + bcolors.ENDC)
+if not args.results_only:
+  print(bcolors.OKBLUE + '[*] Logged into GitHub.com as ' + GH_USERNAME + bcolors.ENDC)
 
 output_file = None
 if args.output and args.output_type != "json":

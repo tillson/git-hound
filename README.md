@@ -19,6 +19,7 @@ We also offer a number of flags to target specific patterns (known service API k
 * `--output` - The output file (default is stdout)
 * `--output-type` - The output type (requires output flag to be set; default is flatfile)
 * `--many-results` - Use result sorting to scrape more than 100 pages of results
+* `--results-only` - Print only regexed results to stdout. Useful for piping into another script
 * `--all` - Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.
 * `--regex-file` - Supply a custom regex file
 * `--language-file` - Supply a custom file with languages to search.
