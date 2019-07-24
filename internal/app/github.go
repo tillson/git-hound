@@ -7,6 +7,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"regexp"
+	"strconv"
 )
 
 // GitHubCredentials stores a GitHub username and password
@@ -52,4 +53,39 @@ func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error
 		return match[1], err
 	}
 	return "", err
+}
+
+// DownloadRawFile downloads files from the githubusercontent CDN.
+func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchResult) (data []byte, err error) {
+	resp, err := client.Get(base + searchResult.Raw)
+	if err != nil {
+		return nil, err
+	}
+	data, err = ioutil.ReadAll(resp.Body)
+	return data, err
+}
+
+// RepoIsUnpopular uses stars/forks/watchers to determine the popularity of a repo.
+func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
+	resp, err := client.Get("https://github.com/" + result.Repo)
+	if err != nil {
+		log.Fatal(err)
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	strData := string(data)
+	regex := regexp.MustCompile("aria\\-label\\=\"(\\d+)\\suser(s?)\\sstarred\\sthis")
+	match := regex.FindStringSubmatch(strData)
+	if len(match) > 1 {
+		stars, err := strconv.Atoi(match[1])
+		if err != nil {
+			log.Fatal(err)
+		}
+		if stars > 10 {
+			return false
+		}
+	}
+	return true
 }

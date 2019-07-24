@@ -19,20 +19,32 @@ type SearchOptions struct {
 	github.SearchOptions
 }
 
+type RepoSearchResult struct {
+	Repo   string
+	File   string
+	Raw    string
+	Source string
+	Query  string
+}
+
 // Search Everything
-func Search(query string, args []string, client *http.Client) {
+func Search(query string, args []string, client *http.Client) (results []RepoSearchResult, err error) {
 
 	options := SearchOptions{
 		MaxPages: 100,
 	}
 
-	SearchGitHub(query, options, client)
-	SearchGist(query, options, client)
+	resultMap := make(map[string]bool)
+	err = SearchGitHub(query, options, client, &results, resultMap)
+	if err != nil {
 
+	}
+	// SearchGist(query, options, client)
+	return results, err
 }
 
 // SearchGitHub searches GitHub code results for the given query
-func SearchGitHub(query string, options SearchOptions, client *http.Client) {
+func SearchGitHub(query string, options SearchOptions, client *http.Client, results *[]RepoSearchResult, resultSet map[string]bool) (err error) {
 	// TODO: A lot of this code is shared between GitHub and Gist searches,
 	// so we should rework the logic
 	base := "https://github.com/search"
@@ -87,10 +99,31 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client) {
 			} else {
 				fmt.Println("[*] Searching 1 page of results...")
 			}
+
 		}
 		page++
+		resultRegex := regexp.MustCompile("href=\"(\\/(.*)\\/blob\\/[0-9a-f]{40}\\/([^#\"]+))\">")
+		matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
+		for _, element := range matches {
+			if len(element) == 4 {
+				if resultSet[(element[2]+"/"+element[3])] == true {
+					continue
+				}
+				resultSet[(element[2] + "/" + element[3])] = true
+				go ScanAndPrintResult(client, RepoSearchResult{
+					Repo:   element[2],
+					File:   element[3],
+					Raw:    element[1],
+					Source: "repo",
+					Query:  query,
+				})
+			} else {
+				fmt.Println(results)
+			}
+		}
 		time.Sleep(time.Duration(delay) * time.Second)
 	}
+	return nil
 }
 
 // SearchGist searches Gist results for the given query
@@ -102,11 +135,10 @@ func SearchGist(query string, options SearchOptions, client *http.Client) {
 func ConstructSearchURL(base string, query string, options SearchOptions) string {
 	var sb strings.Builder
 	sb.WriteString(base)
-	sb.WriteString("?q=" + url.QueryEscape(query))
+	sb.WriteString("?q=" + url.QueryEscape("\""+query+"\""))
 	sb.WriteString("&p=" + strconv.Itoa(options.Page))
 	sb.WriteString("&o=" + options.Order)
 	sb.WriteString("&s=" + options.Sort)
 	sb.WriteString("&type=Code")
-	fmt.Println(sb.String())
 	return sb.String()
 }

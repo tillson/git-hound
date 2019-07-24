@@ -27,7 +27,11 @@ var rootCmd = &cobra.Command{
 			log.Fatal(err)
 		}
 		fmt.Println("[!] Logged into GitHub as " + viper.GetString("github_username"))
-		app.Search("\""+args[0]+"\"", args, client)
+		_, err = app.Search(args[0], args, client)
+		if err != nil {
+			log.Println("Unable to collect search results.")
+			log.Fatal(err)
+		}
 	},
 }
 
