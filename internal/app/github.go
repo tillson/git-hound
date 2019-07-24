@@ -1,0 +1,55 @@
+package app
+
+import (
+	"io/ioutil"
+	"log"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"regexp"
+)
+
+// GitHubCredentials stores a GitHub username and password
+type GitHubCredentials struct {
+	Username string
+	Password string
+}
+
+// LoginToGitHub logs into GitHub with the given
+// credentials and returns an HTTTP client.
+func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err error) {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+	client := http.Client{
+		Jar: jar,
+	}
+	csrf, err := GrabCSRFToken("https://github.com/login", &client)
+	if err != nil {
+		return nil, err
+	}
+	_, err = client.PostForm("https://github.com/session", url.Values{
+		"authenticity_token": {csrf},
+		"login":              {credentials.Username},
+		"password":           {credentials.Password},
+	})
+	return &client, err
+}
+
+// GrabCSRFToken grabs the CSRF token from a GitHub page
+func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error) {
+	resp, err := client.Get(csrfURL)
+	if err != nil {
+		log.Println("Error getting CSRF token page.")
+		log.Println(err)
+	}
+	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+]{32,})\"")
+	data, err := ioutil.ReadAll(resp.Body)
+	dataStr := string(data)
+	match := re.FindStringSubmatch(dataStr)
+	if len(match) == 2 {
+		return match[1], err
+	}
+	return "", err
+}

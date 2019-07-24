@@ -1,2 +1,6 @@
+# Required
 github_username: tillson
 github_password: a8ueifjq4jkasdfoiulk
+
+# Required for filtered repo digger
+github_access_token: afbde843defa7cfa5defacefafda4ab4
