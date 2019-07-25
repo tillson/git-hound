@@ -21,9 +21,6 @@ func Dig(result RepoSearchResult) (matches []Match) {
 	var err error
 
 	if _, err = os.Stat("/tmp/githound/" + result.Repo); os.IsNotExist(err) {
-		if err != nil {
-			log.Fatal(err)
-		}
 		repo, err = git.PlainClone("/tmp/githound/"+result.Repo, false, &git.CloneOptions{
 			URL: "https://github.com/" + result.Repo,
 		})
@@ -148,7 +145,7 @@ func DirSize(path string) (int64, error) {
 // ClearFinishedRepos deletes the stored repos that have already been analyzed.
 func ClearFinishedRepos() {
 	for _, repoString := range finishedRepos {
-		os.Remove("/tmp/githound/" + repoString)
+		os.RemoveAll("/tmp/githound/" + repoString)
 	}
 }
 
