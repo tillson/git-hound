@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/fatih/color"
 	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
@@ -16,21 +17,25 @@ var rootCmd = &cobra.Command{
 	Short: "Git Hound is a pattern-matching, batch-catching secret snatcher.",
 	Long:  `Git Hound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a scoring system.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(args)
+		color.Green("%s", args)
 		ReadConfig()
 		client, err := app.LoginToGitHub(app.GitHubCredentials{
 			Username: viper.GetString("github_username"),
 			Password: viper.GetString("github_password"),
 		})
 		if err != nil {
-			log.Println("Unable to login to GitHub.")
+			color.Red("[!] Unable to login to GitHub.")
 			log.Fatal(err)
 		}
-		fmt.Println("[!] Logged into GitHub as " + viper.GetString("github_username"))
+		color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
 		_, err = app.Search(args[0], args, client)
 		if err != nil {
-			log.Println("Unable to collect search results.")
+			color.Red("[!] Unable to collect search results.")
 			log.Fatal(err)
+		}
+		size, err := app.DirSize("/tmp/githound")
+		if err != nil && size > 1024*1024*500 {
+			app.ClearRepoStorage()
 		}
 	},
 }

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+
 	"github.com/google/go-github/github"
 )
 
@@ -54,14 +56,12 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 		options.Page = (page + 1)
 		response, err := client.Get(ConstructSearchURL(base, query, options))
 		if err != nil {
-			fmt.Println("ERROR")
 			if response != nil {
 				if response.StatusCode == 403 {
 					delay += 5
-					fmt.Println("Rate limited by GitHub. Waiting " + strconv.Itoa(delay) + "s...")
+					color.Yellow("[!] Rate limited by GitHub. Waiting " + strconv.Itoa(delay) + "s...")
 					time.Sleep(time.Duration(delay) * time.Second)
 				} else if response.StatusCode == 503 {
-					fmt.Println("503 breaking")
 					break
 				}
 			} else {
@@ -88,33 +88,32 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if err == nil {
 					pages = newPages
 					if pages > 99 {
-						fmt.Println("[*] Searching 100+ pages of results...")
+						color.Cyan("[*] Searching 100+ pages of results...")
 					} else {
-						fmt.Println("[*] Searching 100 pages of results...")
+						color.Cyan("[*] Searching 100 pages of results...")
 					}
 				} else {
-					fmt.Println("An error occurred while parsing the page count.")
+					color.Red("[!] An error occurred while parsing the page count.")
 					fmt.Println(err)
 				}
 			} else {
-				fmt.Println("[*] Searching 1 page of results...")
+				color.Cyan("[*] Searching 1 page of results...")
 			}
 
 		}
 		page++
-		resultRegex := regexp.MustCompile("href=\"\\/(.*)\\/blob(\\/[0-9a-f]{40}\\/([^#\"]+))\">")
+		resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
 		matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
 		for _, element := range matches {
-			if len(element) == 4 {
+			if len(element) == 5 {
 				if resultSet[(element[2]+"/"+element[3])] == true {
 					continue
 				}
 				resultSet[(element[2] + "/" + element[3])] = true
-				fmt.Println(element)
 				go ScanAndPrintResult(client, RepoSearchResult{
-					Repo:   element[1],
-					File:   element[3],
-					Raw:    element[0],
+					Repo:   element[2],
+					File:   element[4],
+					Raw:    element[1],
 					Source: "repo",
 					Query:  query,
 				})
