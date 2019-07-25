@@ -32,12 +32,12 @@ func Dig(result RepoSearchResult) (matches []Match) {
 		return
 	}
 	reposStored++
-	if reposStored%50 == 0 {
+	if reposStored%20 == 0 {
 		size, err := DirSize("/tmp/githound")
 		if err != nil {
 			log.Fatal(err)
 		}
-		if size > 1024*1024*500 {
+		if size > 500e+6 {
 			ClearFinishedRepos()
 		}
 	}
@@ -80,12 +80,12 @@ func Dig(result RepoSearchResult) (matches []Match) {
 				}
 			}
 			lastHash = commitTree
-			finishedRepos = append(finishedRepos, result.Repo)
 			return nil
 		})
 	if err != nil {
 		log.Println(err)
 	}
+	finishedRepos = append(finishedRepos, result.Repo)
 	return matches
 }
 
@@ -152,5 +152,4 @@ func ClearFinishedRepos() {
 // ClearRepoStorage deletes all stored repos from the disk.
 func ClearRepoStorage() {
 	os.RemoveAll("/tmp/githound")
-	fmt.Println("Cleared /tmp/githound")
 }

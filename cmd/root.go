@@ -19,6 +19,10 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		color.Green("%s", args)
 		ReadConfig()
+		size, err := app.DirSize("/tmp/githound")
+		if err != nil && size > 500e+6 {
+			app.ClearRepoStorage()
+		}
 		client, err := app.LoginToGitHub(app.GitHubCredentials{
 			Username: viper.GetString("github_username"),
 			Password: viper.GetString("github_password"),
@@ -33,8 +37,8 @@ var rootCmd = &cobra.Command{
 			color.Red("[!] Unable to collect search results.")
 			log.Fatal(err)
 		}
-		size, err := app.DirSize("/tmp/githound")
-		if err != nil && size > 1024*1024*500 {
+		size, err = app.DirSize("/tmp/githound")
+		if err != nil && size > 500e+6 {
 			app.ClearRepoStorage()
 		}
 	},

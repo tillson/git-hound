@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -22,6 +23,7 @@ type Match struct {
 	KeywordType string
 	Line        Line
 	Commit      string
+	CommitFile  string
 }
 
 // Line represents a text line, the context for a Match.
@@ -91,7 +93,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
 	// fmt.Println(regexp.QuoteMeta(result.Query))
 	regexString := "(?i)\\b(sf_username|" +
-		// "|\b[\\w0-9\\-]*" +
+		"[\\.\b][A-z0-9\\-]{1,256}\\." +
 		regexp.QuoteMeta(result.Query) + "|db_username|db_password" +
 		"|hooks\\.slack\\.com|pt_token|full_resolution_time_in_minutes" +
 		"|xox[a-zA-Z]-[a-zA-Z0-9-]+" +
@@ -116,17 +118,22 @@ func MatchAPIKeys(str string, result RepoSearchResult) (matches []Match) {
 	regex := regexp.MustCompile(regexString)
 	matcheStrings := regex.FindAllStringSubmatch(str, -1)
 	for _, match := range matcheStrings {
-		matches = append(matches, Match{
-			KeywordType: "apiKey",
-			Text:        string(match[2]),
-			Line:        GetLine(str, match[2]),
-		})
-
+		if Entropy(match[2]) > 3.5 {
+			matches = append(matches, Match{
+				KeywordType: "apiKey",
+				Text:        string(match[2]),
+				Line:        GetLine(str, match[2]),
+			})
+		}
 	}
 	return matches
 }
 
+// MatchFileExtensions matches interesting file extensions.
 func MatchFileExtensions(str string, result RepoSearchResult) (matches []Match) {
+	if str == "" {
+		return matches
+	}
 	regexString := "\\.(zip)$"
 	regex := regexp.MustCompile(regexString)
 	matcheStrings := regex.FindAllStringSubmatch(str, -1)
@@ -173,6 +180,22 @@ func Abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+// Entropy calculates the Shannon entropy of a string
+func Entropy(str string) (entropy float32) {
+	if str == "" {
+		return entropy
+	}
+	freq := 1.0 / float32(len(str))
+	freqMap := make(map[rune]float32)
+	for _, char := range str {
+		freqMap[char] += freq
+	}
+	for _, entry := range freqMap {
+		entropy -= entry * float32(math.Log2(float64(entry)))
+	}
+	return entropy
 }
 
 // PrintResultLink prints a link to the result.
