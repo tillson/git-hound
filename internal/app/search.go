@@ -102,7 +102,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 
 		}
 		page++
-		resultRegex := regexp.MustCompile("href=\"(\\/(.*)\\/blob\\/[0-9a-f]{40}\\/([^#\"]+))\">")
+		resultRegex := regexp.MustCompile("href=\"\\/(.*)\\/blob(\\/[0-9a-f]{40}\\/([^#\"]+))\">")
 		matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
 		for _, element := range matches {
 			if len(element) == 4 {
@@ -110,10 +110,11 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					continue
 				}
 				resultSet[(element[2] + "/" + element[3])] = true
+				fmt.Println(element)
 				go ScanAndPrintResult(client, RepoSearchResult{
-					Repo:   element[2],
+					Repo:   element[1],
 					File:   element[3],
-					Raw:    element[1],
+					Raw:    element[0],
 					Source: "repo",
 					Query:  query,
 				})

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -57,7 +58,8 @@ func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error
 
 // DownloadRawFile downloads files from the githubusercontent CDN.
 func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchResult) (data []byte, err error) {
-	resp, err := client.Get(base + searchResult.Raw)
+	fmt.Println(base + "/" + searchResult.Raw)
+	resp, err := client.Get(base + "/" + searchResult.Raw)
 	if err != nil {
 		return nil, err
 	}

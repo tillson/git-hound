@@ -29,9 +29,9 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	}
 	var base string
 	if repo.Source == "repo" {
-		base = "https://raw.githubusercontent.com/"
+		base = "https://raw.githubusercontent.com"
 	} else if repo.Source == "gist" {
-		base = "https://gist.githubusercontent.com/"
+		base = "https://gist.githubusercontent.com"
 	}
 	data, err := DownloadRawFile(client, base, repo)
 	if err != nil {
@@ -114,3 +114,7 @@ func MatchFileExtensions(str string, result RepoSearchResult) (matches []Match) 
 	}
 	return matches
 }
+
+// func Entropy(str string) float32 {
+
+// }

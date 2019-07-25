@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"log"
 
 	"gopkg.in/src-d/go-git.v4"
@@ -8,13 +9,18 @@ import (
 	"gopkg.in/src-d/go-git.v4/storage/memory"
 )
 
+var queue []RepoSearchResult
+
 // Dig into the secrets of a repo
 func Dig(result RepoSearchResult) (matches []Match) {
-
-	repo, err := git.Clone(memory.NewStorage(), nil, &git.CloneOptions{
+	memoryStorage := memory.NewStorage()
+	fmt.Println("repo: https://github.com/" + result.Repo)
+	repo, err := git.Clone(memoryStorage, nil, &git.CloneOptions{
 		URL: "https://github.com/" + result.Repo,
 	})
+
 	if err != nil {
+		log.Fatal(err)
 		log.Println("Unable to clone git repo")
 		return
 	}
