@@ -25,9 +25,9 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
    1. If it's your first time using the account on the system, you may receieve an account verification email.
 3. `echo "tillsongalloway.com" | git-hound`
 
-### Use cases
+## Use cases
 
-#### Corporate: Searching for exposed customer API keys
+### Corporate: Searching for exposed customer API keys
 
 Knowing the pattern for a specific service's API keys enables you to search GitHub for these keys. You can then pipe them into your own script to test the API key against the service and possibly identify the at-risk account.
 
@@ -35,14 +35,13 @@ Knowing the pattern for a specific service's API keys enables you to search GitH
 
 For detecting future API key leaks, GitHub offers [Push Token Scanning](https://help.github.com/en/articles/about-token-scanning) to immediately detect API keys as they are posted.
 
-#### Bug Bounty Hunters: Searching for leaked employee API tokens
+### Bug Bounty Hunters: Searching for leaked employee API tokens
 
 My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
 
 `echo "uberinternal.com" | githound --dig --many-results --languages common-languages.txt --threads 100`
 
-
-### Flags
+## Flags
 
 * `--subdomain-file` - The file with the subdomains
 * `--dig` - Clone and search the commit histories of unpopular repositories
