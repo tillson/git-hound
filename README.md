@@ -1,39 +1,40 @@
 # GitHound
 
-A pattern-matching, batch-catching secret snatcher.
+A batch-catching, pattern-matching, patch-attacking secret snatcher.
 **This project is intended to be used for educational purposes.**
 
 ![GitHound](assets/logo.png)
 
-GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a scoring system. This differs from other OSINT GitHub scanners by searching keywords across GitHub rather than targetting specific repositories, exposing a fundamentally different set of results. [GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically targets an organization or user's owned repositories for secrets.
+GitHound pinpoints exposed API keys on GitHub using pattern matching, commit history searching, and a unique result scoring system. It scrapes GitHub and Gist code-search results for repos, downloads the matching file, and regex searches the file. With the `--dig` flag, GitHound will analyze the commit history of unpopular repos with few stars, finding secrets that were not properly deleted.
 
 ## Usage
 
-`echo "tillsongalloway.com" | python git-hound.py` or `python git-hound.py --subdomain-file subdomains.txt`
-We also offer a number of flags to target specific patterns (known service API keys), file names (.htpasswd, .env), and languages (python, javascript).
+`echo "tillsongalloway.com" | git-hound` or `git-hound --subdomain-file subdomains.txt`
 
 ### Flags
 
 * `--subdomain-file` - The file with the subdomains
-* `--api-keys` - Enable generic API key searching. This uses common API key patterns and Shannon entropy to find potential exposed API keys.
-* `--output` - The output file (default is stdout)
-* `--output-type` - The output type (requires output flag to be set; default is flatfile)
-* `--many-results` - Use result sorting to scrape more than 100 pages of results
-* `--results-only` - Print only regexed results to stdout. Useful for piping into another script
-* `--all` - Print all URLs, including ones with no pattern match. Otherwise, the scoring system will do the work.
+* `--dig` - Clone and search the commit histories of unpopular repositories
+* `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
+* `--results-only` - Print only regexed results to stdout. Useful for piping custom regex matches into another script
+* `--no-repos` - Don't search repos
+* `--no-gists` - Don't search Gists
+* `--threads` - Specify max number of threads for the commit digger to use.
 * `--regex-file` - Supply a custom regex file
 * `--language-file` - Supply a custom file with languages to search.
 * `--config-file` - Custom config file (default is `config.yml`)
 * `--pages` - Max pages to search (default is 100, the page maximum)
-* `--silent` - Don't print results to stdout (most reasonably used with --output).
-* `--no-antikeywords` - Don't attempt to filter out known mass scans
-* `--only-filtered` - Only search filtered queries (languages, file extensions)
-* `--debug` - Print debug messages. Helpful for debugging slow expressions.
+* `--no-scoring` - Don't use scoring to filter out false positives
+* `--no-api-keys` - Don't perform generic API key searching. GitHound uses common API key patterns, context clues, and a Shannon entropy filter to find potential exposed API keys.
+* `--no-files` - Don't flag interesting file extensions
+* `--only-filtered` - Only search filtered queries (languages)
+* `--debug` - Print verbose debug messages.
 
 ## Setup
 
-1. Clone this repo
-2. Use a Python 3 environment (recommended: virtulenv or [Conda](https://docs.conda.io/en/latest/))
-3. `pip install -r requirements.txt` (or `pip3`)
-4. Set up a `config.yml` file with GitHub credentials. See [config.example.yml](config.example.yml) for an example. Accounts with 2FA are not currently supported.
-5. `echo "tillsongalloway.com" | python git-hound.py`
+1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
+2. `echo "tillsongalloway.com" | git-hound`
+
+## Related tools
+
+* [GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically targets an organization or user's owned repositories for secrets.

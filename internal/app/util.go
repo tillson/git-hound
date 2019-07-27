@@ -31,3 +31,12 @@ func Abs(x int) int {
 	}
 	return x
 }
+
+// CheckErr checks if an error is not null, and
+// exits if it is not null.
+func CheckErr(err error) {
+	if err != nil {
+		color.Red("[!] An error has occurred.")
+		log.Fatal(err)
+	}
+}

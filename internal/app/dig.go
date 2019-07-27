@@ -15,10 +15,14 @@ import (
 var queue []RepoSearchResult
 var reposStored = 0
 var finishedRepos []string
-var pool = make(chan bool, GetFlags().Threads)
+var pool = make(chan bool, 10)
+var poolInitialized = false
 
 // Dig into the secrets of a repo
 func Dig(result RepoSearchResult) (matches []Match) {
+	if !poolInitialized {
+		pool = make(chan bool, GetFlags().Threads)
+	}
 	matchChannel := make(chan []Match)
 	pool <- true
 	go func() {
@@ -56,7 +60,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 			}
 			fmt.Println(err)
 		}
-		return
+		return matches
 	}
 	if GetFlags().Debug {
 		fmt.Println("Finished cloning " + result.Repo)
@@ -78,7 +82,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 			fmt.Println("Error accessing repo head: " + result.Repo)
 			fmt.Println(err)
 		}
-		return
+		return matches
 	}
 
 	commit, err := repo.CommitObject(ref.Hash())
@@ -87,7 +91,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 			fmt.Println("Error getting commit object: " + result.Repo)
 			fmt.Println(err)
 		}
-		return
+		return matches
 	}
 
 	commitIter, err := repo.Log(&git.LogOptions{From: commit.Hash})
@@ -102,8 +106,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 	number := 0
 	commitIter.ForEach(
 		func(c *object.Commit) error {
-			if number > 25 {
-				fmt.Println("stopped early.")
+			if number > 30 {
 				return nil
 			}
 			number++
@@ -137,7 +140,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 // ScanDiff finds secrets in the diff between two Git trees.
 func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matches []Match) {
 	if from == to || from == nil || to == nil {
-		return
+		return matches
 	}
 	diff, err := from.Diff(to)
 	if err != nil {
@@ -160,29 +163,11 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if err != nil {
 			log.Fatal(err)
 		}
-		var keywordMatches []Match
-		if !GetFlags().NoKeywords {
-			keywordMatches = MatchKeywords(patchStr, result)
-		}
-		if GetFlags().RegexFile != "" {
-			for _, match := range MatchCustomRegex(patchStr, result) {
-				matches = append(matches, match)
-			}
-		}
+		matches, _ = GetMatchesForString(patchStr, result)
 		for _, diffFile := range diffData.Files {
 			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
-				keywordMatches = append(keywordMatches, match)
+				matches = append(matches, match)
 			}
-		}
-		keywordMatches = append(keywordMatches)
-		if !GetFlags().NoAPIKeys {
-			apiMatches := MatchAPIKeys(patchStr, result)
-			for _, r := range apiMatches {
-				matches = append(matches, r)
-			}
-		}
-		for _, r := range keywordMatches {
-			matches = append(matches, r)
 		}
 	}
 	return matches
@@ -214,7 +199,4 @@ func ClearFinishedRepos() {
 // ClearRepoStorage deletes all stored repos from the disk.
 func ClearRepoStorage() {
 	os.RemoveAll("/tmp/githound")
-}
-
-func digWorker(id int, repos <-chan RepoSearchResult, results chan<- []Match) {
 }

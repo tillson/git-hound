@@ -3,15 +3,21 @@ package app
 // Flags stores the program options.
 type Flags struct {
 	SubdomainFile string
-	NoAPIKeys     bool
-	NoKeywords    bool
 	Dig           bool
-	Threads       int
-	Pages         int
 	RegexFile     string
 	LanguageFile  string
+	ConfigFile    string
+	Pages         int
+	ResultsOnly   bool
+	NoAPIKeys     bool
+	NoScoring     bool
+	NoFiles       bool
+	NoKeywords    bool
+	OnlyFiltered  bool
+	Threads       int
 	Debug         bool
-	GistOnly      bool
+	NoGists       bool
+	NoRepos       bool
 	ManyResults   bool
 }
 

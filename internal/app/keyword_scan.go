@@ -55,55 +55,41 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		log.Fatal(err)
 	}
 	resultString := string(data)
-	var keywords []Match
-	if !GetFlags().NoKeywords {
-		keywords = MatchKeywords(resultString, repo)
-	}
-	var apiKeys []Match
-	if !GetFlags().NoAPIKeys {
-		apiKeys = MatchAPIKeys(resultString, repo)
-	}
-	if GetFlags().RegexFile != "" {
-		if !loadedRegexes {
-			initializeCustomRegexes()
-		}
-		for _, match := range MatchCustomRegex(resultString, repo) {
-			keywords = append(keywords, match)
-		}
-	}
 
-	var fossils []Match
-	if repo.Source == "repo" && GetFlags().Dig && RepoIsUnpopular(client, repo) {
+	matches, score := GetMatchesForString(resultString, repo)
+	if repo.Source == "repo" && GetFlags().Dig && RepoIsUnpopular(client, repo) && score > -1 {
 		scannedRepos[repo.Repo] = true
-		fossils = Dig(repo)
-	}
-	for _, result := range fossils {
-		if result.KeywordType == "apiKey" {
-			apiKeys = append(apiKeys, result)
-		} else if result.KeywordType == "keyword" {
-			keywords = append(apiKeys, result)
+		for _, match := range Dig(repo) {
+			matches = append(matches, match)
 		}
 	}
 
-	if len(keywords)+len(apiKeys) > 0 {
-		color.Green("[https://github.com/" + repo.Repo + "]")
-		for _, result := range keywords {
-			PrintContextLine(result.Line)
-			PrintResultLink(repo, result)
+	if len(matches) > 0 {
+		if !GetFlags().ResultsOnly {
+			color.Green("[https://github.com/" + repo.Repo + "]")
 		}
-		for _, result := range apiKeys {
-			if !apiKeyMap[result.Text] {
+		for _, result := range matches {
+			if result.KeywordType == "apiKey" {
+				if apiKeyMap[result.Text] == true {
+					continue
+				}
 				apiKeyMap[result.Text] = true
+			}
+			if GetFlags().ResultsOnly {
+				fmt.Println(result.Text)
+			} else {
 				PrintContextLine(result.Line)
 				PrintResultLink(repo, result)
 			}
 		}
 	}
-
 }
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
-func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
+func MatchKeywords(source string, result RepoSearchResult) (matches []Match) {
+	if GetFlags().NoKeywords || source == "" {
+		return matches
+	}
 	regexString := "(?i)\\b(sf_username|" +
 		"[\\.\b][A-z0-9\\-]{1,256}\\." +
 		regexp.QuoteMeta(result.Query) + "|db_username|db_password" +
@@ -112,13 +98,13 @@ func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
 		"|s3\\.console\\.aws\\.amazon\\.com\\/s3\\/buckets|" +
 		"id_rsa|pg_pass|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
 	regex := regexp.MustCompile(regexString)
-	matchStrings := regex.FindAllString(str, -1)
+	matchStrings := regex.FindAllString(source, -1)
 
 	for _, match := range matchStrings {
 		matches = append(matches, Match{
 			KeywordType: "keyword",
 			Text:        string(match),
-			Line:        GetLine(str, match),
+			Line:        GetLine(source, match),
 		})
 	}
 	return matches
@@ -126,13 +112,13 @@ func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
 
 // MatchAPIKeys takes a string and checks if it contains API keys using pattern matching and entropy checking.
 func MatchAPIKeys(source string, result RepoSearchResult) (matches []Match) {
-	if source == "" {
+	if GetFlags().NoAPIKeys || source == "" {
 		return matches
 	}
-	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,20}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
+	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,10}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
 	regex := regexp.MustCompile(regexString)
-	matcheStrings := regex.FindAllStringSubmatch(source, -1)
-	for _, match := range matcheStrings {
+	matchStrings := regex.FindAllStringSubmatch(source, -1)
+	for _, match := range matchStrings {
 		if Entropy(match[2]) > 3.5 {
 			matches = append(matches, Match{
 				KeywordType: "apiKey",
@@ -165,10 +151,10 @@ func MatchCustomRegex(source string, result RepoSearchResult) (matches []Match) 
 
 // MatchFileExtensions matches interesting file extensions.
 func MatchFileExtensions(source string, result RepoSearchResult) (matches []Match) {
-	if source == "" {
+	if GetFlags().NoFiles || source == "" {
 		return matches
 	}
-	regexString := "\\.(zip)$"
+	regexString := "(?i)\\.(zip|env)$"
 	regex := regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
@@ -192,9 +178,6 @@ func GetLine(source string, pattern string) Line {
 	}
 	for patternIndex+j < len(source) && j < 10 && source[patternIndex+j] != '\n' && source[patternIndex+j] != '\r' {
 		j++
-	}
-	if patternIndex+i == patternIndex+j {
-		fmt.Println("issue: " + pattern)
 	}
 	return Line{Text: source[patternIndex+i : patternIndex+j], MatchIndex: Abs(i), MatchEndIndex: j + Abs(i)}
 }
@@ -244,4 +227,64 @@ func initializeCustomRegexes() {
 		}
 		customRegexes = append(customRegexes, regex)
 	}
+}
+
+// GetMatchesForString runs pattern matching and scoring checks on the given string
+// and returns the matches.
+func GetMatchesForString(source string, result RepoSearchResult) (matches []Match, score int) {
+	if !GetFlags().NoKeywords {
+		for _, match := range MatchKeywords(source, result) {
+			matches = append(matches, match)
+			score += 2
+		}
+	}
+	if !GetFlags().NoAPIKeys {
+		for _, match := range MatchAPIKeys(source, result) {
+			matches = append(matches, match)
+			score += 2
+		}
+	}
+	if GetFlags().RegexFile != "" {
+		if !loadedRegexes {
+			initializeCustomRegexes()
+		}
+		for _, match := range MatchCustomRegex(source, result) {
+			matches = append(matches, match)
+			score += 4
+		}
+	}
+	if !GetFlags().NoScoring {
+		matched, err := regexp.MatchString(result.Repo+result.File, "(?i)(h1domains|bounty\\-targets|url_short|url_list|alexa)")
+		CheckErr(err)
+		if matched {
+			score -= 3
+		}
+		matched, err = regexp.MatchString(result.File, "(?i)(\\.md|\\.csv)$")
+		CheckErr(err)
+		if matched {
+			score -= 2
+		}
+		if len(matches) > 0 {
+			matched, err = regexp.MatchString(result.File, "(?i)\\.(json|yml|py|rb|java)$")
+			CheckErr(err)
+			if matched {
+				score++
+			}
+		}
+		regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
+			"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
+			"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
+		fileNameMatches := regex.FindAllString(result.File, -1)
+		CheckErr(err)
+		if len(fileNameMatches) > 0 {
+			score -= int(math.Pow(2, float64(len(fileNameMatches))))
+		}
+		if score <= 0 && !GetFlags().NoScoring {
+			matches = nil
+		}
+	}
+	if GetFlags().NoScoring {
+		score = 10
+	}
+	return matches, score
 }

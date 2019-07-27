@@ -43,28 +43,42 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 	}
 
 	resultMap := make(map[string]bool)
-	if !GetFlags().GistOnly {
+	if !GetFlags().NoRepos {
 		if len(languages) > 0 {
 			for _, language := range languages {
 				options.Language = language
 				err = SearchGitHub(query, options, client, &results, resultMap)
+				if err != nil {
+					color.Red("[!] Error searching GitHub for `" + query + "`")
+				}
 			}
-		} else {
+		}
+		if !GetFlags().OnlyFiltered {
 			err = SearchGitHub(query, options, client, &results, resultMap)
+			if err != nil {
+				color.Red("[!] Error searching GitHub for `" + query + "`")
+			}
 		}
 	}
-	resultMap = make(map[string]bool)
-	if len(languages) > 0 {
-		for _, language := range languages {
-			options.Language = language
+	if !GetFlags().NoGists {
+		resultMap = make(map[string]bool)
+		if len(languages) > 0 {
+			for _, language := range languages {
+				options.Language = language
+				err = SearchGist(query, options, client, &results, resultMap)
+				if err != nil {
+					color.Red("[!] Error searching Gist for `" + query + "`")
+				}
+			}
+		}
+		if !GetFlags().OnlyFiltered {
 			err = SearchGist(query, options, client, &results, resultMap)
+			if err != nil {
+				color.Red("[!] Error searching Gist for `" + query + "`")
+			}
 		}
-	} else {
-		err = SearchGist(query, options, client, &results, resultMap)
 	}
-	if err != nil {
 
-	}
 	return results, err
 }
 
@@ -121,11 +135,15 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							}
 							pages = newPages
 							if pages > 99 && GetFlags().ManyResults {
-								color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+								if !GetFlags().ResultsOnly {
+									color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+								}
 								orders = append(orders, "desc")
 								rankings = append(orders, "")
 							} else {
-								color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+								if !GetFlags().ResultsOnly {
+									color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+								}
 							}
 						} else {
 							color.Red("[!] An error occurred while parsing the page count.")
@@ -136,7 +154,9 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							color.Red("[!] Unable to log into GitHub.")
 							log.Fatal()
 						} else {
-							color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+							if !GetFlags().ResultsOnly {
+								color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+							}
 						}
 					}
 				}
@@ -211,9 +231,13 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					}
 					pages = newPages
 					if pages > 99 {
-						color.Cyan("[*] Searching 100+ pages of Gist results for '" + query + "'...")
+						if !GetFlags().ResultsOnly {
+							color.Cyan("[*] Searching 100+ pages of Gist results for '" + query + "'...")
+						}
 					} else {
-						color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+						if !GetFlags().ResultsOnly {
+							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+						}
 					}
 				} else {
 					color.Red("[!] An error occurred while parsing the Gist page count.")
@@ -224,7 +248,9 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					color.Red("[!] Unable to log into GitHub.")
 					log.Fatal()
 				} else {
-					color.Cyan("[*] Searching 1 page of Gist results for '" + query + "'...")
+					if !GetFlags().ResultsOnly {
+						color.Cyan("[*] Searching 1 page of Gist results for '" + query + "'...")
+					}
 				}
 			}
 		}
