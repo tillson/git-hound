@@ -26,6 +26,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoAPIKeys, "no-api-keys", false, "Don't search for generic API keys.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoKeywords, "no-keywords", false, "Don't search for built-in keywords")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().ManyResults, "many-results", false, "Search >100 pages with filtering hack")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dig, "dig", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Threads, "threads", 10, "Threads to dig with (default 10).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GistOnly, "gists-only", false, "Only search Gist results")

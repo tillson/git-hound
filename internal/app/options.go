@@ -12,6 +12,7 @@ type Flags struct {
 	LanguageFile  string
 	Debug         bool
 	GistOnly      bool
+	ManyResults   bool
 }
 
 var flags Flags

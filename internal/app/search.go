@@ -75,81 +75,92 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 	base := "https://github.com/search"
 	page, pages := 0, 1
 	var delay = 5
-	for page < pages {
-		options.Page = (page + 1)
-		response, err := client.Get(ConstructSearchURL(base, query, options))
-		if err != nil {
-			if response != nil {
-				if response.StatusCode == 403 {
-					delay += 5
-					color.Yellow("[!] Rate limited by GitHub. Waiting " + strconv.Itoa(delay) + "s...")
-					time.Sleep(time.Duration(delay) * time.Second)
-				} else if response.StatusCode == 503 {
-					break
-				}
-			} else {
-				fmt.Println(err)
+	orders := []string{"asc"}
+	rankings := []string{"indexed"}
+	for i := 0; i < len(orders); i++ {
+		for j := 0; j < len(rankings); j++ {
+			if i == 1 && j == 1 {
+				continue
 			}
-			continue
-		}
-		if delay > 10 {
-			delay--
-		}
-		responseData, err := ioutil.ReadAll(response.Body)
-		responseStr := string(responseData)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if page == 0 {
-			regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
-			match := regex.FindStringSubmatch(responseStr)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if len(match) == 2 {
-				newPages, err := strconv.Atoi(match[1])
-				if err == nil {
-					if newPages > GetFlags().Pages {
-						newPages = GetFlags().Pages
-					}
-					pages = newPages
-					if pages > 99 {
-						color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+			for page < pages {
+				options.Page = (page + 1)
+				response, err := client.Get(ConstructSearchURL(base, query, options))
+				if err != nil {
+					if response != nil {
+						if response.StatusCode == 403 {
+							delay += 5
+							color.Yellow("[!] Rate limited by GitHub. Waiting " + strconv.Itoa(delay) + "s...")
+							time.Sleep(time.Duration(delay) * time.Second)
+						} else if response.StatusCode == 503 {
+							break
+						}
 					} else {
-						color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+						fmt.Println(err)
 					}
-				} else {
-					color.Red("[!] An error occurred while parsing the page count.")
-					fmt.Println(err)
-				}
-			} else {
-				if strings.Index(responseStr, "Sign in to GitHub") > -1 {
-					color.Red("[!] Unable to log into GitHub.")
-					log.Fatal()
-				} else {
-					color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
-				}
-			}
-		}
-		page++
-		resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
-		matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
-		for _, element := range matches {
-			if len(element) == 5 {
-				if resultSet[(element[2]+"/"+element[3])] == true {
 					continue
 				}
-				resultSet[(element[2] + "/" + element[3])] = true
-				go ScanAndPrintResult(client, RepoSearchResult{
-					Repo:   element[2],
-					File:   element[4],
-					Raw:    element[2] + "/master/" + element[4],
-					Source: "repo",
-					Query:  query,
-				})
+				if delay > 10 {
+					delay--
+				}
+				responseData, err := ioutil.ReadAll(response.Body)
+				responseStr := string(responseData)
+				if err != nil {
+					log.Fatal(err)
+				}
+				if page == 0 {
+					regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
+					match := regex.FindStringSubmatch(responseStr)
+					if err != nil {
+						log.Fatal(err)
+					}
+					if len(match) == 2 {
+						newPages, err := strconv.Atoi(match[1])
+						if err == nil {
+							if newPages > GetFlags().Pages {
+								newPages = GetFlags().Pages
+							}
+							pages = newPages
+							if pages > 99 && GetFlags().ManyResults {
+								color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+								orders = append(orders, "desc")
+								rankings = append(orders, "")
+							} else {
+								color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+							}
+						} else {
+							color.Red("[!] An error occurred while parsing the page count.")
+							fmt.Println(err)
+						}
+					} else {
+						if strings.Index(responseStr, "Sign in to GitHub") > -1 {
+							color.Red("[!] Unable to log into GitHub.")
+							log.Fatal()
+						} else {
+							color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+						}
+					}
+				}
+				page++
+				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
+				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
+				for _, element := range matches {
+					if len(element) == 5 {
+						if resultSet[(element[2]+"/"+element[3])] == true {
+							continue
+						}
+						resultSet[(element[2] + "/" + element[3])] = true
+						go ScanAndPrintResult(client, RepoSearchResult{
+							Repo:   element[2],
+							File:   element[4],
+							Raw:    element[2] + "/master/" + element[4],
+							Source: "repo",
+							Query:  query,
+						})
+					}
+				}
+				time.Sleep(time.Duration(delay) * time.Second)
 			}
 		}
-		time.Sleep(time.Duration(delay) * time.Second)
 	}
 	return nil
 }
