@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/waigani/diffparser"
 	"gopkg.in/src-d/go-git.v4"
@@ -20,15 +21,26 @@ func Dig(result RepoSearchResult) (matches []Match) {
 	var repo *git.Repository
 	var err error
 
+	disk := false
 	if _, err = os.Stat("/tmp/githound/" + result.Repo); os.IsNotExist(err) {
 		repo, err = git.PlainClone("/tmp/githound/"+result.Repo, false, &git.CloneOptions{
-			URL: "https://github.com/" + result.Repo,
+			URL:          "https://github.com/" + result.Repo,
+			SingleBranch: true,
+			Depth:        20,
 		})
 	} else {
 		repo, err = git.PlainOpen("/tmp/githound/" + result.Repo)
+		disk = true
 	}
 	if err != nil {
-		fmt.Println(err)
+		if GetFlags().Debug {
+			if disk {
+				fmt.Println("Error opening repo from disk: " + result.Repo)
+			} else {
+				fmt.Println("Error cloning repo: " + result.Repo)
+			}
+			fmt.Println(err)
+		}
 		return
 	}
 	reposStored++
@@ -37,35 +49,39 @@ func Dig(result RepoSearchResult) (matches []Match) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if size > 500e+6 {
+		if size > 50e+6 {
 			ClearFinishedRepos()
 		}
 	}
 
-	if err != nil {
-		log.Fatal(err)
-		log.Println("Unable to clone git repo")
-		return
-	}
 	ref, err := repo.Head()
 	if err != nil {
-		// log.Println(err)
+		if GetFlags().Debug {
+			fmt.Println("Error accessing repo head: " + result.Repo)
+			fmt.Println(err)
+		}
 		return
 	}
 
 	commit, err := repo.CommitObject(ref.Hash())
 	if err != nil {
-		log.Println(err)
+		if GetFlags().Debug {
+			fmt.Println("Error getting commit object: " + result.Repo)
+			fmt.Println(err)
+		}
 		return
 	}
 
 	commitIter, err := repo.Log(&git.LogOptions{From: commit.Hash})
+
 	lastHash, err := commit.Tree()
 	if err != nil {
 		log.Fatal(err)
 	}
 	matchMap := make(map[Match]bool)
-	err = commitIter.ForEach(
+	var waitGroup sync.WaitGroup
+
+	commitIter.ForEach(
 		func(c *object.Commit) error {
 			commitTree, err := c.Tree()
 			if err != nil {
@@ -85,6 +101,8 @@ func Dig(result RepoSearchResult) (matches []Match) {
 	if err != nil {
 		log.Println(err)
 	}
+	waitGroup.Wait()
+	// fmt.Println("finished scanning repo " + result.Repo)
 	finishedRepos = append(finishedRepos, result.Repo)
 	return matches
 }
@@ -99,9 +117,16 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		log.Fatal(err)
 	}
 	for _, change := range diff {
+		if change == nil {
+			continue
+		}
 		patch, err := change.Patch()
 		if err != nil {
-			log.Fatal(err)
+			if GetFlags().Debug {
+				fmt.Println("Diff scan error: Patch error.")
+				fmt.Println(err)
+			}
+			continue
 		}
 		patchStr := patch.String()
 		diffData, err := diffparser.Parse(patchStr)
@@ -116,11 +141,13 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 			}
 		}
 		keywordMatches = append(keywordMatches)
-		apiMatches := MatchAPIKeys(patchStr, result)
-		for _, r := range keywordMatches {
-			matches = append(matches, r)
+		if GetFlags().APIKeys {
+			apiMatches := MatchAPIKeys(patchStr, result)
+			for _, r := range apiMatches {
+				matches = append(matches, r)
+			}
 		}
-		for _, r := range apiMatches {
+		for _, r := range keywordMatches {
 			matches = append(matches, r)
 		}
 	}
@@ -147,6 +174,7 @@ func ClearFinishedRepos() {
 	for _, repoString := range finishedRepos {
 		os.RemoveAll("/tmp/githound/" + repoString)
 	}
+	finishedRepos = nil
 }
 
 // ClearRepoStorage deletes all stored repos from the disk.

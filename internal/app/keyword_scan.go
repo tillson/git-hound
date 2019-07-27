@@ -53,10 +53,13 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	}
 	resultString := string(data)
 	keywords := MatchKeywords(resultString, repo)
-	apiKeys := MatchAPIKeys(resultString, repo)
+	var apiKeys []Match
+	if GetFlags().APIKeys {
+		apiKeys = MatchAPIKeys(resultString, repo)
+	}
 
 	var fossils []Match
-	if RepoIsUnpopular(client, repo) {
+	if GetFlags().Dig && RepoIsUnpopular(client, repo) {
 		scannedRepos[repo.Repo] = true
 		fossils = Dig(repo)
 	}
@@ -71,14 +74,11 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if len(keywords)+len(apiKeys) > 0 {
 		color.Green("[https://github.com/" + repo.Repo + "]")
 		for _, result := range keywords {
-			// color.Red("[" + result.KeywordType + "] " + result.Text)
 			PrintContextLine(result.Line)
 			PrintResultLink(repo, result)
-			// fmt.Println()
 		}
 		for _, result := range apiKeys {
 			if !apiKeyMap[result.Text] {
-				// color.Red("[" + result.KeywordType + "] " + result.Text)
 				apiKeyMap[result.Text] = true
 				PrintContextLine(result.Line)
 				PrintResultLink(repo, result)
@@ -91,7 +91,6 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
 func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
-	// fmt.Println(regexp.QuoteMeta(result.Query))
 	regexString := "(?i)\\b(sf_username|" +
 		"[\\.\b][A-z0-9\\-]{1,256}\\." +
 		regexp.QuoteMeta(result.Query) + "|db_username|db_password" +
@@ -165,7 +164,7 @@ func GetLine(source string, pattern string) Line {
 	return Line{Text: source[patternIndex+i : patternIndex+j], MatchIndex: Abs(i), MatchEndIndex: j + Abs(i)}
 }
 
-// PrintContetLine pretty-prints the line of a Match, with the result highlighted.
+// PrintContextLine pretty-prints the line of a Match, with the result highlighted.
 func PrintContextLine(line Line) {
 	red := color.New(color.FgRed).SprintFunc()
 	fmt.Printf("%s%s%s\n",

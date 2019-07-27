@@ -30,7 +30,7 @@ type RepoSearchResult struct {
 }
 
 // Search Everything
-func Search(query string, args []string, client *http.Client) (results []RepoSearchResult, err error) {
+func Search(query string, client *http.Client) (results []RepoSearchResult, err error) {
 
 	options := SearchOptions{
 		MaxPages: 100,
@@ -88,18 +88,22 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if err == nil {
 					pages = newPages
 					if pages > 99 {
-						color.Cyan("[*] Searching 100+ pages of results...")
+						color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
 					} else {
-						color.Cyan("[*] Searching 100 pages of results...")
+						color.Cyan("[*] Searching 100 pages of results for '" + query + "'...")
 					}
 				} else {
 					color.Red("[!] An error occurred while parsing the page count.")
 					fmt.Println(err)
 				}
 			} else {
-				color.Cyan("[*] Searching 1 page of results...")
+				if strings.Index(responseStr, "Sign in to GitHub") > -1 {
+					color.Red("[!] Unable to log into GitHub.")
+					log.Fatal()
+				} else {
+					color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+				}
 			}
-
 		}
 		page++
 		resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
