@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 
@@ -62,6 +61,7 @@ var rootCmd = &cobra.Command{
 				}
 			} else {
 				color.Red("[!] No search queries specified.")
+				os.Exit(1)
 				return
 			}
 		}
@@ -72,7 +72,7 @@ var rootCmd = &cobra.Command{
 		})
 		if err != nil {
 			color.Red("[!] Unable to login to GitHub.")
-			log.Fatal(err)
+			os.Exit(1)
 		}
 		if !app.GetFlags().ResultsOnly {
 			color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
@@ -110,11 +110,17 @@ func ReadConfig() {
 	viper.AddConfigPath("$HOME/.githound")
 	viper.AddConfigPath(".")
 	if app.GetFlags().ConfigFile != "" {
-		viper.AddConfigPath(app.GetFlags().ConfigFile)
+		viper.SetConfigFile(app.GetFlags().ConfigFile)
 	}
 	err := viper.ReadInConfig()
 	if err != nil {
-		color.Red("[!] config.yml was not found.")
+		if app.GetFlags().ConfigFile != "" {
+			color.Red("[!] '" + app.GetFlags().ConfigFile + "' was not found.")
+
+		} else {
+			color.Red("[!] config.yml was not found.")
+		}
+		os.Exit(1)
 		return
 	}
 }

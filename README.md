@@ -11,6 +11,13 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
 
 `echo "tillsongalloway.com" | git-hound` or `git-hound --subdomain-file subdomains.txt`
 
+## Setup
+
+1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
+2. Create a `config.yml` file with your GitHub username and password (2FA accounts are not supported)
+   1. If it's your first time using the account on the system, you may receieve an account verification email.
+3. `echo "tillsongalloway.com" | git-hound`
+
 ### Flags
 
 * `--subdomain-file` - The file with the subdomains
@@ -29,11 +36,6 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
 * `--no-files` - Don't flag interesting file extensions
 * `--only-filtered` - Only search filtered queries (languages)
 * `--debug` - Print verbose debug messages.
-
-## Setup
-
-1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
-2. `echo "tillsongalloway.com" | git-hound`
 
 ## Related tools
 

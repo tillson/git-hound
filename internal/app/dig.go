@@ -22,6 +22,7 @@ var poolInitialized = false
 func Dig(result RepoSearchResult) (matches []Match) {
 	if !poolInitialized {
 		pool = make(chan bool, GetFlags().Threads)
+		poolInitialized = true
 	}
 	matchChannel := make(chan []Match)
 	pool <- true
