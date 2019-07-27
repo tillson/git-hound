@@ -39,7 +39,8 @@ For detecting future API key leaks, GitHub offers [Push Token Scanning](https://
 
 My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
 
-`echo "uberinternal.com" | githound --dig --many-results --languages common-languages.txt --regex-file halcorp-api-regexes.txt`
+`echo "uberinternal.com" | githound --dig --many-results --languages common-languages.txt --threads 100`
+
 
 ### Flags
 
