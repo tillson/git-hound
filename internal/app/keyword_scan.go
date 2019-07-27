@@ -36,6 +36,9 @@ type Line struct {
 var scannedRepos = make(map[string]bool)
 var apiKeyMap = make(map[string]bool)
 
+var customRegexes []*regexp.Regexp
+var loadedRegexes = false
+
 // ScanAndPrintResult scans and prints information about a search result.
 func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if scannedRepos[repo.Repo] {
@@ -52,10 +55,21 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		log.Fatal(err)
 	}
 	resultString := string(data)
-	keywords := MatchKeywords(resultString, repo)
+	var keywords []Match
+	if !GetFlags().NoKeywords {
+		keywords = MatchKeywords(resultString, repo)
+	}
 	var apiKeys []Match
 	if !GetFlags().NoAPIKeys {
 		apiKeys = MatchAPIKeys(resultString, repo)
+	}
+	if GetFlags().RegexFile != "" {
+		if !loadedRegexes {
+			initializeCustomRegexes()
+		}
+		for _, match := range MatchCustomRegex(resultString, repo) {
+			keywords = append(keywords, match)
+		}
 	}
 
 	var fossils []Match
@@ -111,36 +125,58 @@ func MatchKeywords(str string, result RepoSearchResult) (matches []Match) {
 }
 
 // MatchAPIKeys takes a string and checks if it contains API keys using pattern matching and entropy checking.
-func MatchAPIKeys(str string, result RepoSearchResult) (matches []Match) {
+func MatchAPIKeys(source string, result RepoSearchResult) (matches []Match) {
+	if source == "" {
+		return matches
+	}
 	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,20}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
 	regex := regexp.MustCompile(regexString)
-	matcheStrings := regex.FindAllStringSubmatch(str, -1)
+	matcheStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matcheStrings {
 		if Entropy(match[2]) > 3.5 {
 			matches = append(matches, Match{
 				KeywordType: "apiKey",
 				Text:        string(match[2]),
-				Line:        GetLine(str, match[2]),
+				Line:        GetLine(source, match[2]),
 			})
 		}
 	}
 	return matches
 }
 
+// MatchCustomRegex matches a string against a slice of regexes.
+func MatchCustomRegex(source string, result RepoSearchResult) (matches []Match) {
+	if source == "" {
+		return matches
+	}
+	for _, regex := range customRegexes {
+		regMatches := regex.FindAllString(source, -1)
+		for _, regMatch := range regMatches {
+			matches = append(matches, Match{
+				KeywordType: "custom",
+				Text:        regMatch,
+				Line:        GetLine(source, regMatch),
+			})
+		}
+
+	}
+	return matches
+}
+
 // MatchFileExtensions matches interesting file extensions.
-func MatchFileExtensions(str string, result RepoSearchResult) (matches []Match) {
-	if str == "" {
+func MatchFileExtensions(source string, result RepoSearchResult) (matches []Match) {
+	if source == "" {
 		return matches
 	}
 	regexString := "\\.(zip)$"
 	regex := regexp.MustCompile(regexString)
-	matcheStrings := regex.FindAllStringSubmatch(str, -1)
-	for _, match := range matcheStrings {
+	matchStrings := regex.FindAllStringSubmatch(source, -1)
+	for _, match := range matchStrings {
 		if len(match) > 0 {
 			matches = append(matches, Match{
 				KeywordType: "fileExtension",
 				Text:        string(match[0]),
-				Line:        GetLine(str, match[0]),
+				Line:        GetLine(source, match[0]),
 			})
 		}
 	}
@@ -172,14 +208,6 @@ func PrintContextLine(line Line) {
 		line.Text[line.MatchEndIndex:])
 }
 
-// Abs returns the absolute value of x.
-func Abs(x int) int {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
-
 // Entropy calculates the Shannon entropy of a string
 func Entropy(str string) (entropy float32) {
 	if str == "" {
@@ -202,5 +230,18 @@ func PrintResultLink(result RepoSearchResult, match Match) {
 		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/commit/" + match.Commit)
 	} else {
 		color.New(color.Faint).Println("https://github.com/" + result.Raw)
+	}
+}
+
+func initializeCustomRegexes() {
+	loadedRegexes = true
+	regexStrings := GetFileLines(GetFlags().RegexFile)
+	for _, regexString := range regexStrings {
+		regex, err := regexp.Compile(regexString)
+		if err != nil {
+			color.Red("[!] Invalid regex: `" + regexString + " ` .")
+			break
+		}
+		customRegexes = append(customRegexes, regex)
 	}
 }

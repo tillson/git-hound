@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -144,7 +143,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				go ScanAndPrintResult(client, RepoSearchResult{
 					Repo:   element[2],
 					File:   element[4],
-					Raw:    element[1],
+					Raw:    element[2] + "/master/" + element[4],
 					Source: "repo",
 					Query:  query,
 				})
@@ -239,17 +238,4 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 		time.Sleep(time.Duration(delay) * time.Second)
 	}
 	return nil
-}
-
-// ConstructSearchURL serializes its parameters into a search URL
-func ConstructSearchURL(base string, query string, options SearchOptions) string {
-	var sb strings.Builder
-	sb.WriteString(base)
-	sb.WriteString("?q=" + url.QueryEscape("\""+query+"\""))
-	sb.WriteString("&p=" + strconv.Itoa(options.Page))
-	sb.WriteString("&o=" + options.Order)
-	sb.WriteString("&s=" + options.Sort)
-	sb.WriteString("&l=" + options.Language)
-	sb.WriteString("&type=Code")
-	return sb.String()
 }

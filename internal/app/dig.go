@@ -160,8 +160,15 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		keywordMatches := MatchKeywords(patchStr, result)
+		var keywordMatches []Match
+		if !GetFlags().NoKeywords {
+			keywordMatches = MatchKeywords(patchStr, result)
+		}
+		if GetFlags().RegexFile != "" {
+			for _, match := range MatchCustomRegex(patchStr, result) {
+				matches = append(matches, match)
+			}
+		}
 		for _, diffFile := range diffData.Files {
 			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
 				keywordMatches = append(keywordMatches, match)

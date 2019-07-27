@@ -4,6 +4,7 @@ package app
 type Flags struct {
 	SubdomainFile string
 	NoAPIKeys     bool
+	NoKeywords    bool
 	Dig           bool
 	Threads       int
 	Pages         int

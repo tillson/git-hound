@@ -23,3 +23,11 @@ func GetFileLines(file string) (lines []string) {
 	}
 	return lines
 }
+
+// Abs returns the absolute value of x.
+func Abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

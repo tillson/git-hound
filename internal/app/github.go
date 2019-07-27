@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // GitHubCredentials stores a GitHub username and password
@@ -83,7 +84,7 @@ func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if stars > 10 {
+		if stars > 6 {
 			return false
 		}
 	}
@@ -107,4 +108,17 @@ func GetRawGistPage(client *http.Client, gist string) string {
 		return match[1]
 	}
 	return ""
+}
+
+// ConstructSearchURL serializes its parameters into a search URL
+func ConstructSearchURL(base string, query string, options SearchOptions) string {
+	var sb strings.Builder
+	sb.WriteString(base)
+	sb.WriteString("?q=" + url.QueryEscape("\""+query+"\""))
+	sb.WriteString("&p=" + strconv.Itoa(options.Page))
+	sb.WriteString("&o=" + options.Order)
+	sb.WriteString("&s=" + options.Sort)
+	sb.WriteString("&l=" + options.Language)
+	sb.WriteString("&type=Code")
+	return sb.String()
 }
