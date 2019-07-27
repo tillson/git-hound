@@ -3,9 +3,14 @@ package app
 // Flags stores the program options.
 type Flags struct {
 	SubdomainFile string
-	Debug         bool
+	NoAPIKeys     bool
 	Dig           bool
-	APIKeys       bool
+	Threads       int
+	Pages         int
+	RegexFile     string
+	LanguageFile  string
+	Debug         bool
+	GistOnly      bool
 }
 
 var flags Flags

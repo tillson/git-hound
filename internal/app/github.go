@@ -89,3 +89,22 @@ func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
 	}
 	return true
 }
+
+// GetRawGistPage gets the source code for a Gist.
+func GetRawGistPage(client *http.Client, gist string) string {
+	resp, err := client.Get("https://gist.github.com/" + gist)
+	if err != nil {
+		log.Fatal(err)
+	}
+	escaped := regexp.QuoteMeta(gist)
+	regex := regexp.MustCompile("href\\=\"\\/(" + escaped + "\\/raw\\/[0-9a-z]{40}\\/[\\w_\\-\\.\\/\\%]{1,255})\"\\>")
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	match := regex.FindStringSubmatch(string(body))
+	if len(match) == 2 {
+		return match[1]
+	}
+	return ""
+}

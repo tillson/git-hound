@@ -12,7 +12,7 @@ import entropy
 import fileinput
 
 parser = argparse.ArgumentParser(
-    description='Git Hound')
+    description='GitHound')
 parser.add_argument(
   '--subdomain-file', type=str,
   help='The file with the subdomains (or other queries).')
@@ -257,7 +257,7 @@ def regex_array(array):
     regex += elm + r"|"
     if '.*' in elm:
       if not args.results_only:
-        print(bcolors.WARNING + "[!] The regex wildcard match .* can be slow if used improperly and may slow down Git Hound." + bcolors.ENDC)
+        print(bcolors.WARNING + "[!] The regex wildcard match .* can be slow if used improperly and may slow down GitHound." + bcolors.ENDC)
   regex = regex[:-1] + r")"
   return re.compile(regex)
 

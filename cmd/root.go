@@ -15,27 +15,28 @@ import (
 	"github.com/tillson/git-hound/internal/app"
 )
 
-// InitializeFlags initializes Git Hound's command line flags.
+// InitializeFlags initializes GitHound's command line flags.
 func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SubdomainFile, "subdomain-file", "", "A file containing a list of subdomains (or other queries).")
 	// rootCmd.PersistentFlags().String("output-file", "", "The output file.")
 	// rootCmd.PersistentFlags().String("output-type", "", "The output type (text, json).")
-	// rootCmd.PersistentFlags().String("regex-file", "", "Supply your own list of regexes.")
-	// rootCmd.PersistentFlags().String("language-file", "", "Supply your own list of languages to search (java, python).")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "", "Supply your own list of regexes.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	// rootCmd.PersistentFlags().String("config-file", "", "Supply a custom configuration location.")
-	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "api-keys", false, "Search for generic API keys.")
+	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoAPIKeys, "no-api-keys", false, "Don't search for generic API keys.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dig, "dig", false, "Dig through commit history to find more secrets (CPU intensive).")
-	// rootCmd.PersistentFlags().Bool("silent", false, "Don't print results to stdout (most reasonably used with --output-file)")
-	// rootCmd.PersistentFlags().Bool("gist-only", false, "Only search Gists")
+	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Threads, "threads", 10, "Threads to dig with (default 10).")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GistOnly, "gists-only", false, "Only search Gist results")
 	// rootCmd.PersistentFlags().Bool("many-results", false, "Search more than 100 pages of results")
 	// rootCmd.PersistentFlags().BoolVar(&app.GetFlags().PrintRepeats, "print-repeats", false, "Print repeated matches")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "debug", false, "Enables verbose debug logging.")
 }
 
 var rootCmd = &cobra.Command{
-	Use:   "Git Hound",
-	Short: "Git Hound is a pattern-matching, batch-catching secret snatcher.",
-	Long:  `Git Hound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a robust scoring system.`,
+	Use:   "githound",
+	Short: "GitHound is a pattern-matching, batch-catching secret snatcher.",
+	Long:  `GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a robust scoring system.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ReadConfig()
 		size, err := app.DirSize("/tmp/githound")
@@ -45,14 +46,16 @@ var rootCmd = &cobra.Command{
 
 		var queries []string
 		if cmd.Flag("subdomain-file").Value.String() != "" {
-			for _, query := range GetFileLines(app.GetFlags().SubdomainFile) {
+			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
 				queries = append(queries, query)
 			}
 		} else {
 			if !terminal.IsTerminal(0) {
 				b, _ := ioutil.ReadAll(os.Stdin)
 				for _, line := range strings.Split(string(b), "\n") {
-					queries = append(queries, line)
+					if line != "" {
+						queries = append(queries, line)
+					}
 				}
 			} else {
 				color.Red("[!] No search queries specified.")
@@ -104,14 +107,4 @@ func ReadConfig() {
 		color.Red("[!] config.yml was not found.")
 		return
 	}
-}
-
-// GetFileLines takes a file path and returns its lines, stringified.
-func GetFileLines(file string) []string {
-	dat, err := ioutil.ReadFile(file)
-	if err != nil {
-		color.Red("[!] File '" + file + "' does not exist.")
-		log.Fatal()
-	}
-	return strings.Split(string(dat), "\n")
 }

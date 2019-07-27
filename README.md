@@ -1,11 +1,11 @@
-# Git Hound
+# GitHound
 
 A pattern-matching, batch-catching secret snatcher.
 **This project is intended to be used for educational purposes.**
 
-![Git Hound](assets/logo.png)
+![GitHound](assets/logo.png)
 
-Git Hound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a scoring system. This differs from other OSINT GitHub scanners by searching keywords across GitHub rather than targetting specific repositories, exposing a fundamentally different set of results. [GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically targets an organization or user's owned repositories for secrets.
+GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a scoring system. This differs from other OSINT GitHub scanners by searching keywords across GitHub rather than targetting specific repositories, exposing a fundamentally different set of results. [GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically targets an organization or user's owned repositories for secrets.
 
 ## Usage
 

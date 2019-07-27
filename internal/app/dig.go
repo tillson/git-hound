@@ -15,13 +15,28 @@ import (
 var queue []RepoSearchResult
 var reposStored = 0
 var finishedRepos []string
+var pool = make(chan bool, GetFlags().Threads)
 
 // Dig into the secrets of a repo
 func Dig(result RepoSearchResult) (matches []Match) {
-	var repo *git.Repository
-	var err error
+	matchChannel := make(chan []Match)
+	pool <- true
+	go func() {
+		matchChannel <- digHelper(result)
+		<-pool
+		close(matchChannel)
+	}()
+	matches = <-matchChannel
+	return matches
+}
 
+func digHelper(result RepoSearchResult) (matches []Match) {
+	if GetFlags().Debug {
+		fmt.Println("Digging " + result.Repo)
+	}
+	var repo *git.Repository
 	disk := false
+	var err error
 	if _, err = os.Stat("/tmp/githound/" + result.Repo); os.IsNotExist(err) {
 		repo, err = git.PlainClone("/tmp/githound/"+result.Repo, false, &git.CloneOptions{
 			URL:          "https://github.com/" + result.Repo,
@@ -42,6 +57,9 @@ func Dig(result RepoSearchResult) (matches []Match) {
 			fmt.Println(err)
 		}
 		return
+	}
+	if GetFlags().Debug {
+		fmt.Println("Finished cloning " + result.Repo)
 	}
 	reposStored++
 	if reposStored%20 == 0 {
@@ -81,8 +99,14 @@ func Dig(result RepoSearchResult) (matches []Match) {
 	matchMap := make(map[Match]bool)
 	var waitGroup sync.WaitGroup
 
+	number := 0
 	commitIter.ForEach(
 		func(c *object.Commit) error {
+			if number > 25 {
+				fmt.Println("stopped early.")
+				return nil
+			}
+			number++
 			commitTree, err := c.Tree()
 			if err != nil {
 				return err
@@ -104,6 +128,9 @@ func Dig(result RepoSearchResult) (matches []Match) {
 	waitGroup.Wait()
 	// fmt.Println("finished scanning repo " + result.Repo)
 	finishedRepos = append(finishedRepos, result.Repo)
+	if GetFlags().Debug {
+		fmt.Println("Finished scanning repo " + result.Repo)
+	}
 	return matches
 }
 
@@ -141,7 +168,7 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 			}
 		}
 		keywordMatches = append(keywordMatches)
-		if GetFlags().APIKeys {
+		if !GetFlags().NoAPIKeys {
 			apiMatches := MatchAPIKeys(patchStr, result)
 			for _, r := range apiMatches {
 				matches = append(matches, r)
@@ -180,4 +207,7 @@ func ClearFinishedRepos() {
 // ClearRepoStorage deletes all stored repos from the disk.
 func ClearRepoStorage() {
 	os.RemoveAll("/tmp/githound")
+}
+
+func digWorker(id int, repos <-chan RepoSearchResult, results chan<- []Match) {
 }

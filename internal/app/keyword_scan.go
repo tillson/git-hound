@@ -54,12 +54,12 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	resultString := string(data)
 	keywords := MatchKeywords(resultString, repo)
 	var apiKeys []Match
-	if GetFlags().APIKeys {
+	if !GetFlags().NoAPIKeys {
 		apiKeys = MatchAPIKeys(resultString, repo)
 	}
 
 	var fossils []Match
-	if GetFlags().Dig && RepoIsUnpopular(client, repo) {
+	if repo.Source == "repo" && GetFlags().Dig && RepoIsUnpopular(client, repo) {
 		scannedRepos[repo.Repo] = true
 		fossils = Dig(repo)
 	}
@@ -82,7 +82,6 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				apiKeyMap[result.Text] = true
 				PrintContextLine(result.Line)
 				PrintResultLink(repo, result)
-				// fmt.Println()
 			}
 		}
 	}
