@@ -11,16 +11,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-
-	"github.com/google/go-github/github"
 )
 
-type SearchOptions struct {
-	MaxPages int
-	Language string
-	github.SearchOptions
-}
-
+// RepoSearchResult represents a result in GitHub/Gist code search.
 type RepoSearchResult struct {
 	Repo          string
 	File          string

@@ -9,12 +9,21 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/google/go-github/github"
 )
 
 // GitHubCredentials stores a GitHub username and password
 type GitHubCredentials struct {
 	Username string
 	Password string
+}
+
+// SearchOptions are the options that the GitHub search will use.
+type SearchOptions struct {
+	MaxPages int
+	Language string
+	github.SearchOptions
 }
 
 // LoginToGitHub logs into GitHub with the given
