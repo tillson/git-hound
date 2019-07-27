@@ -9,7 +9,7 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
 ## Features
 
 * GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
-* Generic API key detection using pattern matching, context, and [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory>).
+* Generic API key detection using pattern matching, context, and [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>).
 * Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)..
 * Unique scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging.
 * Options to build GitHound into your workflow, like custom regexes
