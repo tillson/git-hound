@@ -90,13 +90,14 @@ func MatchKeywords(source string, result RepoSearchResult) (matches []Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
-	regexString := "(?i)\\b(sf_username|" +
-		"[\\.\b][A-z0-9\\-]{1,256}\\." +
-		regexp.QuoteMeta(result.Query) + "|db_username|db_password" +
+	regexString := "(?i)\\b(sf_username" +
+		// "[\\.\b][A-z0-9\\-]{1,256}\\." +
+		// regexp.QuoteMeta(result.Query) +
+		"|db_username|db_password" +
 		"|hooks\\.slack\\.com|pt_token|full_resolution_time_in_minutes" +
 		"|xox[a-zA-Z]-[a-zA-Z0-9-]+" +
 		"|s3\\.console\\.aws\\.amazon\\.com\\/s3\\/buckets|" +
-		"id_rsa|pg_pass|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
+		"id_rsa|pg_pass)\\b" //|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
 	regex := regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllString(source, -1)
 
@@ -212,7 +213,7 @@ func PrintResultLink(result RepoSearchResult, match Match) {
 	if match.Commit != "" {
 		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/commit/" + match.Commit)
 	} else {
-		color.New(color.Faint).Println("https://github.com/" + result.Raw)
+		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/blob/master/" + result.File)
 	}
 }
 
@@ -254,7 +255,7 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		}
 	}
 	if !GetFlags().NoScoring {
-		matched, err := regexp.MatchString(result.Repo+result.File, "(?i)(h1domains|bounty\\-targets|url_short|url_list|alexa)")
+		matched, err := regexp.MatchString(result.Repo+result.File, "(?i)(h1domains|bugbounty|bug\\-bounty|bounty\\-targets|url_short|url_list|alexa)")
 		CheckErr(err)
 		if matched {
 			score -= 3

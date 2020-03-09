@@ -36,6 +36,9 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	client := http.Client{
 		Jar: jar,
 	}
+	rt := WithHeader(client.Transport)
+	rt.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36")
+	client.Transport = rt
 	csrf, err := GrabCSRFToken("https://github.com/login", &client)
 	if err != nil {
 		return nil, err
@@ -130,4 +133,25 @@ func ConstructSearchURL(base string, query string, options SearchOptions) string
 	sb.WriteString("&l=" + options.Language)
 	sb.WriteString("&type=Code")
 	return sb.String()
+}
+
+type withHeader struct {
+	http.Header
+	rt http.RoundTripper
+}
+
+func WithHeader(rt http.RoundTripper) withHeader {
+	if rt == nil {
+		rt = http.DefaultTransport
+	}
+
+	return withHeader{Header: make(http.Header), rt: rt}
+}
+
+func (h withHeader) RoundTrip(req *http.Request) (*http.Response, error) {
+	for k, v := range h.Header {
+		req.Header[k] = v
+	}
+
+	return h.rt.RoundTrip(req)
 }
