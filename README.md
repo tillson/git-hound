@@ -12,7 +12,7 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
 * Generic API key detection using pattern matching, context, and [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>).
 * Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)..
 * Unique scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging.
-* Options to build GitHound into your workflow, like custom regexes
+* Options to build GitHound into your workflow, like custom regexes and results-only output mode.
 
 ## Usage
 
@@ -29,9 +29,9 @@ GitHound pinpoints exposed API keys on GitHub using pattern matching, commit his
 
 ### Corporate: Searching for exposed customer API keys
 
-Knowing the pattern for a specific service's API keys enables you to search GitHub for these keys. You can then pipe them into your own script to test the API key against the service and possibly identify the at-risk account.
+Knowing the pattern for a specific service's API keys enables you to search GitHub for these keys. You can then pipe matches for your custom key regex into your own script to test the API key against the service and to identify the at-risk account.
 
-`echo "api.halcorp.com" | githound --dig --many-results --regex-file halcorp-api-regexes.txt --results-only | python halapitester.py`
+`echo "api.halcorp.biz" | githound --dig --many-results --regex-file halcorp-api-regexes.txt --results-only | python halapitester.py`
 
 For detecting future API key leaks, GitHub offers [Push Token Scanning](https://help.github.com/en/articles/about-token-scanning) to immediately detect API keys as they are posted.
 
