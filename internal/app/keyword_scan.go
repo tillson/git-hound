@@ -96,10 +96,8 @@ func MatchKeywords(source string) (matches []Match) {
 
 	base64Strings := regex.FindAllString(source, -1)
 	if base64Strings != nil {
-		fmt.Println(base64Strings)
 		for _, match := range base64Strings {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
-			fmt.Println(decoded)
 			decodedMatches := MatchKeywords(string(decoded))
 
 			for _, decodedMatch := range decodedMatches {
@@ -139,10 +137,8 @@ func MatchAPIKeys(source string) (matches []Match) {
 	regex := regexp.MustCompile(base64Regex)
 	base64Strings := regex.FindAllString(source, -1)
 	if base64Strings != nil {
-		fmt.Println(base64Strings)
 		for _, match := range base64Strings {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
-			fmt.Println(decoded)
 			decodedMatches := MatchAPIKeys(string(decoded))
 
 			for _, decodedMatch := range decodedMatches {
@@ -175,10 +171,8 @@ func MatchCustomRegex(source string) (matches []Match) {
 	regex := regexp.MustCompile(base64Regex)
 	base64Strings := regex.FindAllString(source, -1)
 	if base64Strings != nil {
-		fmt.Println(base64Strings)
 		for _, match := range base64Strings {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
-			fmt.Println(decoded)
 			decodedMatches := MatchCustomRegex(string(decoded))
 
 			for _, decodedMatch := range decodedMatches {

@@ -60,6 +60,7 @@ func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error
 	}
 	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+]{32,})\"")
 	data, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 	dataStr := string(data)
 	match := re.FindStringSubmatch(dataStr)
 	if len(match) == 2 {
