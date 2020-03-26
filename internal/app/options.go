@@ -3,7 +3,8 @@ package app
 // Flags stores the program options.
 type Flags struct {
 	SubdomainFile string
-	Dig           bool
+	DigRepo       bool
+	DigCommits    bool
 	RegexFile     string
 	LanguageFile  string
 	ConfigFile    string

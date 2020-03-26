@@ -95,6 +95,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if err != nil {
 					if response != nil {
 						if response.StatusCode == 403 {
+							response.Body.Close()
 							delay += 5
 							color.Yellow("[!] Rate limited by GitHub. Waiting " + strconv.Itoa(delay) + "s...")
 							time.Sleep(time.Duration(delay) * time.Second)
@@ -114,6 +115,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if err != nil {
 					log.Fatal(err)
 				}
+				response.Body.Close()
 				if page == 0 {
 					regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
 					match := regex.FindStringSubmatch(responseStr)

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -86,48 +87,76 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 		return matches
 	}
 
-	commit, err := repo.CommitObject(ref.Hash())
-	if err != nil {
-		if GetFlags().Debug {
-			fmt.Println("Error getting commit object: " + result.Repo)
-			fmt.Println(err)
-		}
-		return matches
-	}
-
-	commitIter, err := repo.Log(&git.LogOptions{From: commit.Hash})
-
-	lastHash, err := commit.Tree()
-	if err != nil {
-		log.Fatal(err)
-	}
 	matchMap := make(map[Match]bool)
-	var waitGroup sync.WaitGroup
-
-	number := 0
-	commitIter.ForEach(
-		func(c *object.Commit) error {
-			if number > 30 {
-				return nil
-			}
-			number++
-			commitTree, err := c.Tree()
-			if err != nil {
-				return err
-			}
-			diffMatches := ScanDiff(lastHash, commitTree, result)
-			for _, match := range diffMatches {
-				if !matchMap[match] {
-					matchMap[match] = true
-					match.Commit = c.Hash.String()
-					matches = append(matches, match)
-				}
-			}
-			lastHash = commitTree
+	if GetFlags().DigRepo {
+		// search current repo state
+		root := "/tmp/githound/" + result.Repo
+		var files []string
+		err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			files = append(files, path)
 			return nil
 		})
-	if err != nil {
-		log.Println(err)
+		if err != nil {
+			panic(err)
+		}
+		for _, file := range files {
+			dat, _ := ioutil.ReadFile(file)
+			if err != nil {
+				newMatches := MatchKeywords(string(dat))
+				for _, match := range newMatches {
+					match.CommitFile = file[len("/tmp/githound/"):]
+					if !matchMap[match] {
+						matchMap[match] = true
+						matches = append(matches, match)
+					}
+				}
+			}
+		}
+	}
+
+	var waitGroup sync.WaitGroup
+	if GetFlags().DigCommits {
+		commit, err := repo.CommitObject(ref.Hash())
+		if err != nil {
+			if GetFlags().Debug {
+				fmt.Println("Error getting commit object: " + result.Repo)
+				fmt.Println(err)
+			}
+			return matches
+		}
+
+		commitIter, err := repo.Log(&git.LogOptions{From: commit.Hash})
+
+		lastHash, err := commit.Tree()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		number := 0
+		commitIter.ForEach(
+			func(c *object.Commit) error {
+				if number > 30 {
+					return nil
+				}
+				number++
+				commitTree, err := c.Tree()
+				if err != nil {
+					return err
+				}
+				diffMatches := ScanDiff(lastHash, commitTree, result)
+				for _, match := range diffMatches {
+					match.Commit = c.Hash.String()
+					if !matchMap[match] {
+						matchMap[match] = true
+						matches = append(matches, match)
+					}
+				}
+				lastHash = commitTree
+				return nil
+			})
+		if err != nil {
+			log.Println(err)
+		}
 	}
 	waitGroup.Wait()
 	// fmt.Println("finished scanning repo " + result.Repo)

@@ -17,7 +17,8 @@ import (
 // InitializeFlags initializes GitHound's command line flags.
 func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SubdomainFile, "subdomain-file", "", "A file containing a list of subdomains (or other queries).")
-	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dig, "dig", false, "Dig through commit history to find more secrets (CPU intensive).")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "", "Supply your own list of regexes.")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")

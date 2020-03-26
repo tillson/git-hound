@@ -1,6 +1,7 @@
 package app
 
 import (
+	b64 "encoding/base64"
 	"fmt"
 	"log"
 	"math"
@@ -57,7 +58,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	resultString := string(data)
 
 	matches, score := GetMatchesForString(resultString, repo)
-	if repo.Source == "repo" && GetFlags().Dig && RepoIsUnpopular(client, repo) && score > -1 {
+	if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 		scannedRepos[repo.Repo] = true
 		for _, match := range Dig(repo) {
 			matches = append(matches, match)
@@ -86,10 +87,27 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 }
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
-func MatchKeywords(source string, result RepoSearchResult) (matches []Match) {
+func MatchKeywords(source string) (matches []Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
+	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
+	regex := regexp.MustCompile(base64Regex)
+
+	base64Strings := regex.FindAllString(source, -1)
+	if base64Strings != nil {
+		fmt.Println(base64Strings)
+		for _, match := range base64Strings {
+			decoded, _ := b64.StdEncoding.DecodeString(match)
+			fmt.Println(decoded)
+			decodedMatches := MatchKeywords(string(decoded))
+
+			for _, decodedMatch := range decodedMatches {
+				matches = append(matches, decodedMatch)
+			}
+		}
+	}
+
 	regexString := "(?i)\\b(sf_username" +
 		// "[\\.\b][A-z0-9\\-]{1,256}\\." +
 		// regexp.QuoteMeta(result.Query) +
@@ -98,7 +116,7 @@ func MatchKeywords(source string, result RepoSearchResult) (matches []Match) {
 		"|xox[a-zA-Z]-[a-zA-Z0-9-]+" +
 		"|s3\\.console\\.aws\\.amazon\\.com\\/s3\\/buckets|" +
 		"id_rsa|pg_pass)\\b" //|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
-	regex := regexp.MustCompile(regexString)
+	regex = regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllString(source, -1)
 
 	for _, match := range matchStrings {
@@ -112,12 +130,29 @@ func MatchKeywords(source string, result RepoSearchResult) (matches []Match) {
 }
 
 // MatchAPIKeys takes a string and checks if it contains API keys using pattern matching and entropy checking.
-func MatchAPIKeys(source string, result RepoSearchResult) (matches []Match) {
+func MatchAPIKeys(source string) (matches []Match) {
 	if GetFlags().NoAPIKeys || source == "" {
 		return matches
 	}
+
+	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
+	regex := regexp.MustCompile(base64Regex)
+	base64Strings := regex.FindAllString(source, -1)
+	if base64Strings != nil {
+		fmt.Println(base64Strings)
+		for _, match := range base64Strings {
+			decoded, _ := b64.StdEncoding.DecodeString(match)
+			fmt.Println(decoded)
+			decodedMatches := MatchAPIKeys(string(decoded))
+
+			for _, decodedMatch := range decodedMatches {
+				matches = append(matches, decodedMatch)
+			}
+		}
+	}
+
 	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,10}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
-	regex := regexp.MustCompile(regexString)
+	regex = regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
 		if Entropy(match[2]) > 3.5 {
@@ -132,9 +167,24 @@ func MatchAPIKeys(source string, result RepoSearchResult) (matches []Match) {
 }
 
 // MatchCustomRegex matches a string against a slice of regexes.
-func MatchCustomRegex(source string, result RepoSearchResult) (matches []Match) {
+func MatchCustomRegex(source string) (matches []Match) {
 	if source == "" {
 		return matches
+	}
+	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
+	regex := regexp.MustCompile(base64Regex)
+	base64Strings := regex.FindAllString(source, -1)
+	if base64Strings != nil {
+		fmt.Println(base64Strings)
+		for _, match := range base64Strings {
+			decoded, _ := b64.StdEncoding.DecodeString(match)
+			fmt.Println(decoded)
+			decodedMatches := MatchCustomRegex(string(decoded))
+
+			for _, decodedMatch := range decodedMatches {
+				matches = append(matches, decodedMatch)
+			}
+		}
 	}
 	for _, regex := range customRegexes {
 		regMatches := regex.FindAllString(source, -1)
@@ -234,13 +284,13 @@ func initializeCustomRegexes() {
 // and returns the matches.
 func GetMatchesForString(source string, result RepoSearchResult) (matches []Match, score int) {
 	if !GetFlags().NoKeywords {
-		for _, match := range MatchKeywords(source, result) {
+		for _, match := range MatchKeywords(source) {
 			matches = append(matches, match)
 			score += 2
 		}
 	}
 	if !GetFlags().NoAPIKeys {
-		for _, match := range MatchAPIKeys(source, result) {
+		for _, match := range MatchAPIKeys(source) {
 			matches = append(matches, match)
 			score += 2
 		}
@@ -249,7 +299,7 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		if !loadedRegexes {
 			initializeCustomRegexes()
 		}
-		for _, match := range MatchCustomRegex(source, result) {
+		for _, match := range MatchCustomRegex(source) {
 			matches = append(matches, match)
 			score += 4
 		}
@@ -264,6 +314,11 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		CheckErr(err)
 		if matched {
 			score -= 2
+		}
+		matched, err = regexp.MatchString(result.File, "^vim_settings.xml$")
+		CheckErr(err)
+		if matched {
+			score += 5
 		}
 		if len(matches) > 0 {
 			matched, err = regexp.MatchString(result.File, "(?i)\\.(json|yml|py|rb|java)$")

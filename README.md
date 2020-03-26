@@ -4,14 +4,15 @@ A batch-catching, pattern-matching, patch-attacking secret snatcher.
 
 ![GitHound](assets/logo.png)
 
-GitHound pinpoints exposed API keys on GitHub using pattern matching, commit history searching, and a unique result scoring system. GitHound has earned me over $3000 applied to Bug Bounty research. Corporate and Bug Bounty Hunter use cases are outlined below.
+GitHound pinpoints exposed API keys and other sensitive information on GitHub using pattern matching, commit history searching, and a unique result scoring system. GitHound has earned me over $7500 applied to Bug Bounty research. Corporate and Bug Bounty Hunter use cases are outlined below.
 
 ## Features
 
 * GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
 * Generic API key detection using pattern matching, context, and [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>).
 * Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)..
-* Unique scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging.
+* Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging.
+* Base64 detection and decoding
 * Options to build GitHound into your workflow, like custom regexes and results-only output mode.
 
 ## Usage
@@ -44,7 +45,8 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 ## Flags
 
 * `--subdomain-file` - The file with the subdomains
-* `--dig` - Clone and search the commit histories of unpopular repositories
+* `--dig-files` - Clone and search the repo's files for results
+* `--dig-commits` - Clone and search the repo's commit history for results
 * `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
 * `--results-only` - Print only regexed results to stdout. Useful for piping custom regex matches into another script
 * `--no-repos` - Don't search repos

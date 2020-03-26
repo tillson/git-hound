@@ -75,6 +75,7 @@ func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchRe
 		return nil, err
 	}
 	data, err = ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
 	return data, err
 }
 
@@ -88,6 +89,7 @@ func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
 	if err != nil {
 		log.Fatal(err)
 	}
+	resp.Body.Close()
 	strData := string(data)
 	regex := regexp.MustCompile("aria\\-label\\=\"(\\d+)\\suser(s?)\\sstarred\\sthis")
 	match := regex.FindStringSubmatch(strData)
@@ -115,6 +117,7 @@ func GetRawGistPage(client *http.Client, gist string) string {
 	if err != nil {
 		log.Fatal(err)
 	}
+	resp.Body.Close()
 	match := regex.FindStringSubmatch(string(body))
 	if len(match) == 2 {
 		return match[1]
@@ -128,8 +131,8 @@ func ConstructSearchURL(base string, query string, options SearchOptions) string
 	sb.WriteString(base)
 	sb.WriteString("?q=" + url.QueryEscape("\""+query+"\" stars:<5 fork:false"))
 	sb.WriteString("&p=" + strconv.Itoa(options.Page))
-	sb.WriteString("&o=" + options.Order)
-	sb.WriteString("&s=" + options.Sort)
+	// sb.WriteString("&o=desc")    // + options.Order)
+	sb.WriteString("&s=indexed") // + options.Sort)
 	sb.WriteString("&l=" + options.Language)
 	sb.WriteString("&type=Code")
 	return sb.String()
