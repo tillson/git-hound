@@ -152,6 +152,8 @@ func MatchAPIKeys(source string) (matches []Match) {
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
 		if Entropy(match[2]) > 3.5 {
+			// fmt.Println(string(match[2]))
+			// fmt.Println(GetLine(source, match[2]))
 			matches = append(matches, Match{
 				KeywordType: "apiKey",
 				Text:        string(match[2]),
@@ -299,23 +301,23 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		}
 	}
 	if !GetFlags().NoScoring {
-		matched, err := regexp.MatchString(result.Repo+result.File, "(?i)(h1domains|bugbounty|bug\\-bounty|bounty\\-targets|url_short|url_list|alexa)")
+		matched, err := regexp.MatchString("(?i)(h1domains|bugbounty|bug\\-bounty|bounty\\-targets|url_short|url_list|alexa)", result.Repo+result.File)
 		CheckErr(err)
 		if matched {
 			score -= 3
 		}
-		matched, err = regexp.MatchString(result.File, "(?i)(\\.md|\\.csv)$")
+		matched, err = regexp.MatchString("(?i)(\\.md|\\.csv)$", result.File)
 		CheckErr(err)
 		if matched {
 			score -= 2
 		}
-		matched, err = regexp.MatchString(result.File, "^vim_settings.xml$")
+		matched, err = regexp.MatchString("^vim_settings.xml$", result.File)
 		CheckErr(err)
 		if matched {
 			score += 5
 		}
 		if len(matches) > 0 {
-			matched, err = regexp.MatchString(result.File, "(?i)\\.(json|yml|py|rb|java)$")
+			matched, err = regexp.MatchString("(?i)\\.(json|yml|py|rb|java)$", result.File)
 			CheckErr(err)
 			if matched {
 				score++

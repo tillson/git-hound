@@ -97,7 +97,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 			return nil
 		})
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
 		}
 		for _, file := range files {
 			dat, _ := ioutil.ReadFile(file)
