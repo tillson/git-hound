@@ -116,7 +116,6 @@ func MatchKeywords(source string) (matches []Match) {
 		"id_rsa|pg_pass)\\b" //|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
 	regex = regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllString(source, -1)
-
 	for _, match := range matchStrings {
 		matches = append(matches, Match{
 			KeywordType: "keyword",
