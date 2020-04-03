@@ -25,6 +25,7 @@ type Match struct {
 	Line        Line
 	Commit      string
 	CommitFile  string
+	File        string
 }
 
 // Line represents a text line, the context for a Match.
@@ -258,7 +259,11 @@ func PrintResultLink(result RepoSearchResult, match Match) {
 	if match.Commit != "" {
 		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/commit/" + match.Commit)
 	} else {
-		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/blob/master/" + result.File)
+		file := match.File
+		if file == "" {
+			file = result.File
+		}
+		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/blob/master/" + file)
 	}
 }
 

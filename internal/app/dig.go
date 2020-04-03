@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -122,7 +123,9 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						newMatches, score := GetMatchesForString(string(ascii), result)
 						if score > 0 {
 							for _, match := range newMatches {
-								match.CommitFile = file[len("/tmp/githound/"):]
+								relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+								match.CommitFile = relPath
+								match.File = relPath
 								if !matchMap[match] {
 									matchMap[match] = true
 									matches = append(matches, match)
