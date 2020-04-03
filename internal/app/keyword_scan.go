@@ -147,7 +147,7 @@ func MatchAPIKeys(source string) (matches []Match) {
 		}
 	}
 
-	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|KEY|ADMIn|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,10}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
+	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|API|ADMIN|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,10}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
 	regex = regexp.MustCompile(regexString)
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {

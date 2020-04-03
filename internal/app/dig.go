@@ -117,11 +117,10 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 							}
 						}
 						if float32(len(ascii))/float32(len(data)) < 0.7 {
-							// fmt.Println("skipping " + file)
 							continue
 						}
 						newMatches, score := GetMatchesForString(string(ascii), result)
-						if score > 0 {
+						if score > 1 {
 							for _, match := range newMatches {
 								relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
 								match.CommitFile = relPath
@@ -167,7 +166,6 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						if err != nil {
 							return err
 						}
-						fmt.Println("scanning diff")
 						diffMatches := ScanDiff(lastHash, commitTree, result)
 						for _, match := range diffMatches {
 							match.Commit = c.Hash.String()
