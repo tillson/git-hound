@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -44,11 +45,13 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 	disk := false
 	var err error
 	if _, err = os.Stat("/tmp/githound/" + result.Repo); os.IsNotExist(err) {
-		repo, err = git.PlainClone("/tmp/githound/"+result.Repo, false, &git.CloneOptions{
+		context, cancel := context.WithTimeout(context.Background(), 30*1000)
+		repo, err = git.PlainCloneContext(context, "/tmp/githound/"+result.Repo, false, &git.CloneOptions{
 			URL:          "https://github.com/" + result.Repo,
 			SingleBranch: true,
 			Depth:        20,
 		})
+		defer cancel()
 	} else {
 		repo, err = git.PlainOpen("/tmp/githound/" + result.Repo)
 		disk = true
