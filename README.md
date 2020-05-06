@@ -62,6 +62,6 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 * `--only-filtered` - Only search filtered queries (languages)
 * `--debug` - Print verbose debug messages.
 
-## Related tools
+## References
 
-* [GitRob](https://github.com/michenriksen/gitrob) is an excellent tool that specifically targets an organization or user's repositories for exposed credentials and displays them on a beautiful web interface.
+* [How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories (Meli, McNiece, Reaves)](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf)
