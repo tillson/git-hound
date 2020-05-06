@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/waigani/diffparser"
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
 )
 
 var queue []RepoSearchResult
@@ -24,6 +24,7 @@ var poolInitialized = false
 
 // Dig into the secrets of a repo
 func Dig(result RepoSearchResult) (matches []Match) {
+	// fmt.Println(result.Repo)
 	if !poolInitialized {
 		pool = make(chan bool, GetFlags().Threads)
 		poolInitialized = true
@@ -101,6 +102,9 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 				root := "/tmp/githound/" + result.Repo
 				var files []string
 				err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+					if strings.HasPrefix(path, root+"/.git/") {
+						return nil
+					}
 					files = append(files, path)
 					return nil
 				})
@@ -116,10 +120,28 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 								ascii = append(ascii, b)
 							}
 						}
-						if float32(len(ascii))/float32(len(data)) < 0.7 {
-							continue
+						fileResult := result
+						fileResult.File = file
+						score := 0
+						var newMatches []Match
+						for _, match := range MatchFileExtensions(file, fileResult) {
+							// fmt.Println(file)
+							// fmt.Println(match)
+							newMatches = append(newMatches, match)
+							score += 5
 						}
-						newMatches, score := GetMatchesForString(string(ascii), result)
+						if float32(len(ascii))/float32(len(data)) < 0.7 {
+							// fmt.Println("skipping: " + file)
+						} else {
+							searchMatches, searchScore := GetMatchesForString(string(ascii), result)
+							score += searchScore
+							if searchScore > 1 {
+								for _, newMatch := range searchMatches {
+									newMatches = append(newMatches, newMatch)
+								}
+							}
+						}
+						// fmt.Println(file)
 						if score > 1 {
 							for _, match := range newMatches {
 								relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
@@ -149,10 +171,14 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 				}
 
 				commitIter, err := repo.Log(&git.LogOptions{From: commit.Hash})
-
+				if err != nil {
+					fmt.Println(err)
+					continue
+				}
 				lastHash, err := commit.Tree()
 				if err != nil {
-					log.Fatal(err)
+					fmt.Println(err)
+					continue
 				}
 
 				number := 0
@@ -191,7 +217,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 
 		}
 	} else {
-		return
+		return matches
 	}
 }
 

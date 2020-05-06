@@ -91,7 +91,9 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 			}
 			for page < pages {
 				options.Page = (page + 1)
-				response, err := client.Get(ConstructSearchURL(base, query, options))
+				str := ConstructSearchURL(base, query, options)
+				// fmt.Println(str)
+				response, err := client.Get(str)
 				if err != nil {
 					if response != nil {
 						if response.StatusCode == 403 {

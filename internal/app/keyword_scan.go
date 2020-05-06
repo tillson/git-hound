@@ -107,7 +107,7 @@ func MatchKeywords(source string) (matches []Match) {
 		}
 	}
 
-	regexString := "(?i)\\b(sf_username" +
+	regexString := "(?i)\\b(sf_username|AKIA" +
 		// "[\\.\b][A-z0-9\\-]{1,256}\\." +
 		// regexp.QuoteMeta(result.Query) +
 		"|db_username|db_password" +
@@ -205,8 +205,9 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 	if GetFlags().NoFiles || source == "" {
 		return matches
 	}
-	regexString := "(?i)\\.(zip|env)$"
+	regexString := "(?i)(vim_settings\\.xml)(\\.(zip|env|docx|xlsx|pptx|pdf))$"
 	regex := regexp.MustCompile(regexString)
+	// fmt.Println(source)
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
 		if len(match) > 0 {
@@ -329,6 +330,11 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 			CheckErr(err)
 			if matched {
 				score++
+			}
+			matched, err = regexp.MatchString("(?i)\\.(xlsx|docx|doc)$", result.File)
+			CheckErr(err)
+			if matched {
+				score += 3
 			}
 		}
 		regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
