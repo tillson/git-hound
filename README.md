@@ -9,11 +9,11 @@ GitHound pinpoints exposed API keys and other sensitive information across all o
 ## Features
 
 * GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
-* Generic API key detection using pattern matching, context, and [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>).
-* Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)..
-* Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging.
+* Generic API key detection using pattern matching, context, [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>), and other heuristics
+* Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)
+* Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging
 * Base64 detection and decoding
-* Options to build GitHound into your workflow, like custom regexes and results-only output mode.
+* Options to build GitHound into your workflow, like custom regexes and results-only output mode
 
 ## Usage
 
@@ -32,7 +32,7 @@ GitHound pinpoints exposed API keys and other sensitive information across all o
 
 Knowing the pattern for a specific service's API keys enables you to search GitHub for these keys. You can then pipe matches for your custom key regex into your own script to test the API key against the service and to identify the at-risk account.
 
-`echo "api.halcorp.biz" | githound --dig --many-results --regex-file halcorp-api-regexes.txt --results-only | python halapitester.py`
+`echo "api.halcorp.biz" | githound --dig-files --dig-commits --many-results --regex-file halcorp-api-regexes.txt --results-only | python halapitester.py`
 
 For detecting future API key leaks, GitHub offers [Push Token Scanning](https://help.github.com/en/articles/about-token-scanning) to immediately detect API keys as they are posted.
 
@@ -40,7 +40,7 @@ For detecting future API key leaks, GitHub offers [Push Token Scanning](https://
 
 My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
 
-`echo "uberinternal.com" | githound --dig --many-results --languages common-languages.txt --threads 100`
+`echo "uberinternal.com" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
 
 ## Flags
 
