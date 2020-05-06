@@ -74,7 +74,7 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 			"otp":                {otp},
 		})
 		data, err = ioutil.ReadAll(resp.Body)
-		fmt.Println(string(data))
+		// fmt.Println(string(data))
 	}
 
 	return &client, err

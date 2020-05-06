@@ -125,8 +125,6 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						score := 0
 						var newMatches []Match
 						for _, match := range MatchFileExtensions(file, fileResult) {
-							// fmt.Println(file)
-							// fmt.Println(match)
 							newMatches = append(newMatches, match)
 							score += 5
 						}
@@ -135,7 +133,9 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						} else {
 							searchMatches, searchScore := GetMatchesForString(string(ascii), result)
 							score += searchScore
+							// fmt.Println(searchMatches)
 							if searchScore > 1 {
+								// fmt.Println(searchMatches)
 								for _, newMatch := range searchMatches {
 									newMatches = append(newMatches, newMatch)
 								}
