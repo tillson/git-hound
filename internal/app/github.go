@@ -1,11 +1,14 @@
 package app
 
 import (
+	"bufio"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -29,6 +32,7 @@ type SearchOptions struct {
 // LoginToGitHub logs into GitHub with the given
 // credentials and returns an HTTTP client.
 func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err error) {
+
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		return nil, err
@@ -43,11 +47,36 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	if err != nil {
 		return nil, err
 	}
-	_, err = client.PostForm("https://github.com/session", url.Values{
+	resp, err := client.PostForm("https://github.com/session", url.Values{
 		"authenticity_token": {csrf},
 		"login":              {credentials.Username},
 		"password":           {credentials.Password},
 	})
+	// fmt.Println(resp.StatusCode)
+	data, err := ioutil.ReadAll(resp.Body)
+	dataStr := string(data)
+	if strings.Index(dataStr, "name=\"otp\"") > -1 {
+		csrf, err = GrabCSRFTokenBody(dataStr)
+		if err != nil {
+			return nil, err
+		}
+		tty, err := os.Open("/dev/tty")
+		if err != nil {
+			log.Fatalf("can't open /dev/tty: %s", err)
+		}
+		fmt.Printf("Enter your GitHub 2FA code: ")
+		scanner := bufio.NewScanner(tty)
+		_ = scanner.Scan()
+		otp := scanner.Text()
+		resp, err = client.PostForm("https://github.com/sessions/two-factor", url.Values{
+
+			"authenticity_token": {csrf},
+			"otp":                {otp},
+		})
+		data, err = ioutil.ReadAll(resp.Body)
+		fmt.Println(string(data))
+	}
+
 	return &client, err
 }
 
@@ -58,11 +87,16 @@ func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error
 		log.Println("Error getting CSRF token page.")
 		log.Println(err)
 	}
-	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+]{32,})\"")
 	data, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	dataStr := string(data)
-	match := re.FindStringSubmatch(dataStr)
+	return GrabCSRFTokenBody(dataStr)
+}
+
+// GrabCSRFTokenBody grabs the CSRF token from a GitHub page
+func GrabCSRFTokenBody(pageBody string) (token string, err error) {
+	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+]{32,})\"")
+	match := re.FindStringSubmatch(pageBody)
 	if len(match) == 2 {
 		return match[1], err
 	}

@@ -107,7 +107,7 @@ func MatchKeywords(source string) (matches []Match) {
 		}
 	}
 
-	regexString := "(?i)\\b(sf_username" +
+	regexString := "(?i)\\b(sf_username|AKIA" +
 		// "[\\.\b][A-z0-9\\-]{1,256}\\." +
 		// regexp.QuoteMeta(result.Query) +
 		"|db_username|db_password" +
@@ -152,8 +152,12 @@ func MatchAPIKeys(source string) (matches []Match) {
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
 		if Entropy(match[2]) > 3.5 {
-			// fmt.Println(string(match[2]))
-			// fmt.Println(GetLine(source, match[2]))
+			if containsSequence(match[2]) {
+				continue
+			}
+			if containsCommonWord(match[2]) {
+				continue
+			}
 			matches = append(matches, Match{
 				KeywordType: "apiKey",
 				Text:        string(match[2]),
@@ -201,8 +205,9 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 	if GetFlags().NoFiles || source == "" {
 		return matches
 	}
-	regexString := "(?i)\\.(zip|env)$"
+	regexString := "(?i)(vim_settings\\.xml)(\\.(zip|env|docx|xlsx|pptx|pdf))$"
 	regex := regexp.MustCompile(regexString)
+	// fmt.Println(source)
 	matchStrings := regex.FindAllStringSubmatch(source, -1)
 	for _, match := range matchStrings {
 		if len(match) > 0 {
@@ -326,6 +331,11 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 			if matched {
 				score++
 			}
+			matched, err = regexp.MatchString("(?i)\\.(xlsx|docx|doc)$", result.File)
+			CheckErr(err)
+			if matched {
+				score += 3
+			}
 		}
 		regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
 			"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
@@ -343,4 +353,31 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		score = 10
 	}
 	return matches, score
+}
+
+// Additional filters based off of https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf
+
+var r *regexp.Regexp
+
+func containsCommonWord(str string) bool {
+	if r == nil {
+		r = regexp.MustCompile("(?i)(" + strings.Join(getProgrammingWords(), "|") + ")")
+	}
+	if r.FindString(str) != "" {
+		return true
+	}
+	return false
+}
+
+func containsSequence(str string) bool {
+	b := []byte(str)
+	matches := 0
+	for i := 1; i < len(b); i++ {
+		if b[i] == b[i-1] || b[i] == b[i-1]-1 || b[i] == b[i-1]+1 {
+			matches++
+		}
+	}
+	// fmt.Println(float64(matches) / float64(len(b)))
+	// over half of the characters in the string were a sequence
+	return float64(matches)/float64(len(b)) > 0.5
 }

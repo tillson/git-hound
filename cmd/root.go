@@ -1,10 +1,9 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
@@ -44,6 +43,7 @@ var rootCmd = &cobra.Command{
 		ReadConfig()
 		size, err := app.DirSize("/tmp/githound")
 		if err == nil && size > 50e+6 {
+			fmt.Println("Cleaning up local repo storage...")
 			app.ClearRepoStorage()
 		}
 
@@ -54,10 +54,12 @@ var rootCmd = &cobra.Command{
 			}
 		} else {
 			if !terminal.IsTerminal(0) {
-				b, _ := ioutil.ReadAll(os.Stdin)
-				for _, line := range strings.Split(string(b), "\n") {
-					if line != "" {
-						queries = append(queries, line)
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					bytes := scanner.Bytes()
+					str := string(bytes)
+					if str != "" {
+						queries = append(queries, str)
 					}
 				}
 			} else {
@@ -71,7 +73,9 @@ var rootCmd = &cobra.Command{
 			Username: viper.GetString("github_username"),
 			Password: viper.GetString("github_password"),
 		})
+		// if client.
 		if err != nil {
+			fmt.Println(err)
 			color.Red("[!] Unable to login to GitHub.")
 			os.Exit(1)
 		}
