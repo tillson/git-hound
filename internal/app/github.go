@@ -64,16 +64,27 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 		if err != nil {
 			log.Fatalf("can't open /dev/tty: %s", err)
 		}
+		fmt.Println(resp.Request.URL)
+		return nil, nil
 		fmt.Printf("Enter your GitHub 2FA code: ")
 		scanner := bufio.NewScanner(tty)
 		_ = scanner.Scan()
 		otp := scanner.Text()
-		resp, err = client.PostForm("https://github.com/sessions/two-factor", url.Values{
+		if strings.Index(resp.Request.URL.String(), "verified-device") > -1 {
+			resp, err = client.PostForm("https://github.com/sessions/verified-device", url.Values{
 
-			"authenticity_token": {csrf},
-			"otp":                {otp},
-		})
-		data, err = ioutil.ReadAll(resp.Body)
+				"authenticity_token": {csrf},
+				"otp":                {otp},
+			})
+			data, err = ioutil.ReadAll(resp.Body)
+		} else {
+			resp, err = client.PostForm("https://github.com/sessions/two-factor", url.Values{
+
+				"authenticity_token": {csrf},
+				"otp":                {otp},
+			})
+			data, err = ioutil.ReadAll(resp.Body)
+		}
 		// fmt.Println(string(data))
 	}
 
