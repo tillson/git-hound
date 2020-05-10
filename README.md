@@ -62,6 +62,9 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 * `--only-filtered` - Only search filtered queries (languages)
 * `--debug` - Print verbose debug messages.
 
+## Sponsoring
+If GitHound has helped you earn bug bounties, [consider sending a few bucks](liberapay.com/tillson) so that I can buy coffee! 
+
 ## References
 
 * [How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories (Meli, McNiece, Reaves)](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf)
