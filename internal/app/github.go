@@ -65,7 +65,7 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 			log.Fatalf("can't open /dev/tty: %s", err)
 		}
 		fmt.Println(resp.Request.URL)
-		return nil, nil
+
 		fmt.Printf("Enter your GitHub 2FA code: ")
 		scanner := bufio.NewScanner(tty)
 		_ = scanner.Scan()
