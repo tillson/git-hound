@@ -63,7 +63,7 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 * `--debug` - Print verbose debug messages.
 
 ## Sponsoring
-If GitHound has helped you earn bug bounties, [consider sending a few bucks](liberapay.com/tillson) so that I can buy coffee! 
+If GitHound has helped you earn bug bounties, [consider sending a few bucks](https://liberapay.com/tillson) so that I can buy coffee! 
 
 ## References
 
