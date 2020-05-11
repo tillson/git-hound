@@ -5,6 +5,7 @@ A batch-catching, pattern-matching, patch-attacking secret snatcher.
 ![GitHound](assets/logo.png)
 
 GitHound pinpoints exposed API keys and other sensitive information across all of GitHub using pattern matching, commit history searching, and a unique result scoring system. GitHound has earned me over $7500 applied to Bug Bounty research. Corporate and Bug Bounty Hunter use cases are outlined below.
+More information on methodologies is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
 
