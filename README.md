@@ -23,7 +23,7 @@ More information on methodologies is available in the [accompanying blog post](h
 ## Setup
 
 1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
-2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password (2FA accounts are not supported). See [config.example.yml](config.example.yml).
+2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password. See [config.example.yml](config.example.yml).
    1. If it's your first time using the account on the system, you may receieve an account verification email.
 3. `echo "tillsongalloway.com" | git-hound`
 
