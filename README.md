@@ -43,6 +43,11 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 
 `echo "uberinternal.com" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
 
+## How does GitHound find API keys?
+https://github.com/tillson/git-hound/blob/master/internal/app/keyword_scan.go
+GitHound finds API keys with a combination of exact regexes for common services like Slack and AWS and a context-sensitive generic API regex. This finds long strings that look like API keys surrounded by keywords like "Authorization" and "API-Token". GitHound assumes that these are false positives and then proves their legitimacy with Shannon entropy, dictionary word checks, uniqueness calculations, and encoding detection. GitHound then outputs high certainty positives.
+For files that encode secrets, decodes base64 strings and searches the encoded strings for API keys.
+
 ## Flags
 
 * `--subdomain-file` - The file with the subdomains
