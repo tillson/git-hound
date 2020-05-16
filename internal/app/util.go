@@ -40,3 +40,26 @@ func CheckErr(err error) {
 		log.Fatal(err)
 	}
 }
+
+// GetRepoURLForSearchResult returns the URL of the repo depending on
+// RepoSearchResult source
+func GetRepoURLForSearchResult(repo RepoSearchResult) string {
+	if repo.Source == "repo" {
+		return "https://github.com/" + repo.Repo
+	} else if repo.Source == "gist" {
+		return "https://gist.github.com/" + repo.Repo
+	}
+	// Left this way in case other Source values ever exist
+	return ""
+}
+
+// GetRawURLForSearchResult returns a raw data URL for a RepoSearchResult
+func GetRawURLForSearchResult(repo RepoSearchResult) string {
+	if repo.Source == "repo" {
+		return "https://raw.githubusercontent.com"
+	} else if repo.Source == "gist" {
+		return "https://gist.githubusercontent.com"
+	}
+	// Left this way in case other Source values ever exist
+	return ""
+}

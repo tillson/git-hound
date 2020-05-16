@@ -20,6 +20,7 @@ type RepoSearchResult struct {
 	Raw           string
 	Source        string
 	Query         string
+	URL           string
 	searchOptions *SearchOptions
 }
 
@@ -172,6 +173,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							Raw:    element[2] + "/master/" + element[4],
 							Source: "repo",
 							Query:  query,
+							URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
 						})
 					}
 				}
@@ -266,6 +268,7 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					Raw:    GetRawGistPage(client, element[1]),
 					Source: "gist",
 					Query:  query,
+					URL:    "https://gist.github.com/" + element[1],
 				})
 			}
 		}
