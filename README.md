@@ -18,7 +18,7 @@ More information on methodologies is available in the [accompanying blog post](h
 
 ## Usage
 
-`echo "tillsongalloway.com" | git-hound` or `git-hound --subdomain-file subdomains.txt`
+`echo "\"tillsongalloway.com\"" | git-hound` or `git-hound --subdomain-file subdomains.txt`
 
 ## Setup
 
@@ -41,7 +41,7 @@ For detecting future API key leaks, GitHub offers [Push Token Scanning](https://
 
 My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
 
-`echo "uberinternal.com" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
+`echo "\"uberinternal.com\"" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
 
 ## How does GitHound find API keys?
 https://github.com/tillson/git-hound/blob/master/internal/app/keyword_scan.go
