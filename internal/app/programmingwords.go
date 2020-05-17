@@ -7700,8 +7700,6 @@ func getProgrammingWords() []string {
 		"mob_skills",
 		"pterm",
 		"jsonexception",
-		"appid",
-		"token",
 		"select",
 		"namestring",
 		"inputtype",
