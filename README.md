@@ -70,7 +70,7 @@ For files that encode secrets, decodes base64 strings and searches the encoded s
 
 ## User feedback
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
-[List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22User+feedback+requested%22)
+[List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
 
 
 ## Sponsoring
