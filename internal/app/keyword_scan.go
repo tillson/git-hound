@@ -46,12 +46,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if scannedRepos[repo.Repo] {
 		return
 	}
-	var base string
-	if repo.Source == "repo" {
-		base = "https://raw.githubusercontent.com"
-	} else if repo.Source == "gist" {
-		base = "https://gist.githubusercontent.com"
-	}
+	base := GetRawURLForSearchResult(repo)
 	data, err := DownloadRawFile(client, base, repo)
 	if err != nil {
 		log.Fatal(err)
@@ -68,7 +63,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 
 	if len(matches) > 0 {
 		if !GetFlags().ResultsOnly {
-			color.Green("[https://github.com/" + repo.Repo + "]")
+			resultRepoURL := GetRepoURLForSearchResult(repo)
+			color.Green("[" + resultRepoURL + "]")
 		}
 		for _, result := range matches {
 			if result.KeywordType == "apiKey" {
@@ -268,7 +264,7 @@ func PrintResultLink(result RepoSearchResult, match Match) {
 		if file == "" {
 			file = result.File
 		}
-		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/blob/master/" + file)
+		color.New(color.Faint).Println(result.URL)
 	}
 }
 
