@@ -174,7 +174,7 @@ func GetRawGistPage(client *http.Client, gist string) string {
 func ConstructSearchURL(base string, query string, options SearchOptions) string {
 	var sb strings.Builder
 	sb.WriteString(base)
-	sb.WriteString("?q=" + url.QueryEscape("\""+query+"\" stars:<5 fork:false"))
+	sb.WriteString("?q=" + url.QueryEscape(query))
 	sb.WriteString("&p=" + strconv.Itoa(options.Page))
 	// sb.WriteString("&o=desc")    // + options.Order)
 	sb.WriteString("&s=indexed") // + options.Sort)
