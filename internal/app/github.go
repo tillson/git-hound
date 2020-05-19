@@ -12,14 +12,17 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/go-github/github"
+	"github.com/pquerna/otp/totp"
 )
 
 // GitHubCredentials stores a GitHub username and password
 type GitHubCredentials struct {
 	Username string
 	Password string
+	OTP      string
 }
 
 // SearchOptions are the options that the GitHub search will use.
@@ -60,15 +63,9 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 		if err != nil {
 			return nil, err
 		}
-		tty, err := os.Open("/dev/tty")
-		if err != nil {
-			log.Fatalf("can't open /dev/tty: %s", err)
-		}
 
-		fmt.Printf("Enter your GitHub 2FA code: ")
-		scanner := bufio.NewScanner(tty)
-		_ = scanner.Scan()
-		otp := scanner.Text()
+		otp := HandleOTPCode(credentials)
+
 		if strings.Index(resp.Request.URL.String(), "verified-device") > -1 {
 			resp, err = client.PostForm("https://github.com/sessions/verified-device", url.Values{
 
@@ -88,6 +85,30 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	}
 
 	return &client, err
+}
+
+// HandleOTPCode returns a user's OTP code for authenticating with Github by searching
+// config values, then CLI arguments, then prompting the user for input
+func HandleOTPCode(credentials GitHubCredentials) string {
+	var otp string
+	if credentials.OTP != "" {
+		// Generate a TOTP code based on TOTP seed in config
+		otp, _ = totp.GenerateCode(credentials.OTP, time.Now())
+	} else if GetFlags().OTPCode != "" {
+		// Use the provided CLI argument (--otp-code) for OTP code
+		otp = GetFlags().OTPCode
+	} else {
+		// Prompt the user for OTP code
+		tty, err := os.Open("/dev/tty")
+		if err != nil {
+			log.Fatalf("can't open /dev/tty: %s", err)
+		}
+		fmt.Printf("Enter your GitHub 2FA code: ")
+		scanner := bufio.NewScanner(tty)
+		_ = scanner.Scan()
+		otp = scanner.Text()
+	}
+	return otp
 }
 
 // GrabCSRFToken grabs the CSRF token from a GitHub page

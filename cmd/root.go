@@ -33,6 +33,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoGists, "no-gists", false, "Don't search Gists")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoRepos, "no-repos", false, "Don't search repos")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "debug", false, "Enables verbose debug logging.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().OTPCode, "otp-code", "", "Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)")
 }
 
 var rootCmd = &cobra.Command{
@@ -72,6 +73,7 @@ var rootCmd = &cobra.Command{
 		client, err := app.LoginToGitHub(app.GitHubCredentials{
 			Username: viper.GetString("github_username"),
 			Password: viper.GetString("github_password"),
+			OTP:      viper.GetString("github_totp_seed"),
 		})
 		// if client.
 		if err != nil {

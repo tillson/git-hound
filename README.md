@@ -23,7 +23,7 @@ More information on methodologies is available in the [accompanying blog post](h
 ## Setup
 
 1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
-2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password. See [config.example.yml](config.example.yml).
+2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password. Optionally, include your 2FA TOTP seed. See [config.example.yml](config.example.yml).
    1. If it's your first time using the account on the system, you may receieve an account verification email.
 3. `echo "tillsongalloway.com" | git-hound`
 
@@ -67,6 +67,7 @@ For files that encode secrets, decodes base64 strings and searches the encoded s
 * `--no-files` - Don't flag interesting file extensions
 * `--only-filtered` - Only search filtered queries (languages)
 * `--debug` - Print verbose debug messages.
+* `--otp-code` - Github account 2FA code for sign-in. (Only use if you have authenticator 2FA setup on your Github account)
 
 ## User feedback
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
