@@ -27,6 +27,13 @@ More information on methodologies is available in the [accompanying blog post](h
    1. If it's your first time using the account on the system, you may receieve an account verification email.
 3. `echo "tillsongalloway.com" | git-hound`
 
+### Two-Factor Authentication
+
+If GitHound is logged into your GitHub account, two-factor authentication may kick in. You can pass 2FA codes to GitHound with `--otp-code`.
+Otherwise, GitHound will prompt you for it when it starts up.
+You can also [supply your 2FA seed](https://github.com/tillson/git-hound/pull/24) in the config and you'll never have to worry about 2FA again.
+Grab the 2FA seed by decoding the barcode that GitHub shows during the 2FA setup process.
+
 ## Use cases
 
 ### Corporate: Searching for exposed customer API keys
@@ -47,6 +54,8 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 https://github.com/tillson/git-hound/blob/master/internal/app/keyword_scan.go
 GitHound finds API keys with a combination of exact regexes for common services like Slack and AWS and a context-sensitive generic API regex. This finds long strings that look like API keys surrounded by keywords like "Authorization" and "API-Token". GitHound assumes that these are false positives and then proves their legitimacy with Shannon entropy, dictionary word checks, uniqueness calculations, and encoding detection. GitHound then outputs high certainty positives.
 For files that encode secrets, decodes base64 strings and searches the encoded strings for API keys.
+
+Check out this [blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/) for more details on use cases and methodologies.
 
 ## Flags
 
