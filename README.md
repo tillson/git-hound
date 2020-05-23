@@ -5,6 +5,7 @@ A batch-catching, pattern-matching, patch-attacking secret snatcher.
 ![GitHound](assets/logo.png)
 
 GitHound pinpoints exposed API keys and other sensitive information across all of GitHub using pattern matching, commit history searching, and a unique result scoring system. GitHound has earned me over $7500 applied to Bug Bounty research. Corporate and Bug Bounty Hunter use cases are outlined below.
+More information on methodologies is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
 
@@ -17,12 +18,12 @@ GitHound pinpoints exposed API keys and other sensitive information across all o
 
 ## Usage
 
-`echo "tillsongalloway.com" | git-hound` or `git-hound --subdomain-file subdomains.txt`
+`echo "\"tillsongalloway.com\"" | git-hound` or `git-hound --subdomain-file subdomains.txt`
 
 ## Setup
 
 1. Download the [latest release of GitHound](https://github.com/tillson/git-hound/releases)
-2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password (2FA accounts are not supported). See [config.example.yml](config.example.yml).
+2. Create a `./config.yml` or `~/.githound/config.yml` with your GitHub username and password. Optionally, include your 2FA TOTP seed. See [config.example.yml](config.example.yml).
    1. If it's your first time using the account on the system, you may receieve an account verification email.
 3. `echo "tillsongalloway.com" | git-hound`
 
@@ -40,7 +41,12 @@ For detecting future API key leaks, GitHub offers [Push Token Scanning](https://
 
 My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
 
-`echo "uberinternal.com" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
+`echo "\"uberinternal.com\"" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
+
+## How does GitHound find API keys?
+https://github.com/tillson/git-hound/blob/master/internal/app/keyword_scan.go
+GitHound finds API keys with a combination of exact regexes for common services like Slack and AWS and a context-sensitive generic API regex. This finds long strings that look like API keys surrounded by keywords like "Authorization" and "API-Token". GitHound assumes that these are false positives and then proves their legitimacy with Shannon entropy, dictionary word checks, uniqueness calculations, and encoding detection. GitHound then outputs high certainty positives.
+For files that encode secrets, decodes base64 strings and searches the encoded strings for API keys.
 
 ## Flags
 
@@ -61,6 +67,15 @@ My primary use for GitHound is for finding sensitive information for Bug Bounty 
 * `--no-files` - Don't flag interesting file extensions
 * `--only-filtered` - Only search filtered queries (languages)
 * `--debug` - Print verbose debug messages.
+* `--otp-code` - Github account 2FA code for sign-in. (Only use if you have authenticator 2FA setup on your Github account)
+
+## User feedback
+These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
+[List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
+
+
+## Sponsoring
+If GitHound helped you earn a big bounty, consider sending me a tip with GitHub Sponsors.
 
 ## References
 

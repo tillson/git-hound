@@ -20,6 +20,7 @@ type Flags struct {
 	NoGists       bool
 	NoRepos       bool
 	ManyResults   bool
+	OTPCode       string
 }
 
 var flags Flags
