@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
 )
@@ -55,7 +57,7 @@ var rootCmd = &cobra.Command{
 			}
 		} else {
 			if !terminal.IsTerminal(0) {
-				scanner := bufio.NewScanner(os.Stdin)
+				scanner := getScanner(args)
 				for scanner.Scan() {
 					bytes := scanner.Bytes()
 					str := string(bytes)
@@ -100,6 +102,14 @@ var rootCmd = &cobra.Command{
 			color.Green("Finished.")
 		}
 	},
+}
+
+func getScanner(args []string) *bufio.Scanner {
+	if args[0] == "searchKeyword" {
+		return bufio.NewScanner(strings.NewReader(args[1]))
+	} else {
+		return bufio.NewScanner(os.Stdin)
+	}
 }
 
 // Execute command
