@@ -89,6 +89,10 @@ On launch.json send the needed flags as args
 "regexes.txt"
 ]
 
+## Building the project
+
+From the main folder: go build .
+
 ## User feedback
 
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
