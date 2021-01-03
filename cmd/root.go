@@ -51,6 +51,10 @@ var rootCmd = &cobra.Command{
 		}
 
 		var queries []string
+		if cmd.Flag("regex-file").Value.String() != "" {
+			fmt.Println(cmd.Flag("regex-file").Value.String())
+		}
+
 		if cmd.Flag("subdomain-file").Value.String() != "" {
 			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
 				queries = append(queries, query)

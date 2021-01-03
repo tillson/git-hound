@@ -26,6 +26,7 @@ type Match struct {
 	Commit      string
 	CommitFile  string
 	File        string
+	Expression  string
 }
 
 // Line represents a text line, the context for a Match.
@@ -77,6 +78,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				fmt.Println(result.Text)
 			} else {
 				PrintContextLine(result.Line)
+				PrintPatternLine(result)
+				PrintKeywordType(result)
 				PrintResultLink(repo, result)
 			}
 		}
@@ -117,6 +120,7 @@ func MatchKeywords(source string) (matches []Match) {
 		matches = append(matches, Match{
 			KeywordType: "keyword",
 			Text:        string(match),
+			Expression:  regex.String(),
 			Line:        GetLine(source, match),
 		})
 	}
@@ -157,6 +161,7 @@ func MatchAPIKeys(source string) (matches []Match) {
 			matches = append(matches, Match{
 				KeywordType: "apiKey",
 				Text:        string(match[2]),
+				Expression:  regex.String(),
 				Line:        GetLine(source, match[2]),
 			})
 		}
@@ -188,6 +193,7 @@ func MatchCustomRegex(source string) (matches []Match) {
 			matches = append(matches, Match{
 				KeywordType: "custom",
 				Text:        regMatch,
+				Expression:  regex.String(),
 				Line:        GetLine(source, regMatch),
 			})
 		}
@@ -210,6 +216,7 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 			matches = append(matches, Match{
 				KeywordType: "fileExtension",
 				Text:        string(match[0]),
+				Expression:  regex.String(),
 				Line:        GetLine(source, match[0]),
 			})
 		}
@@ -237,6 +244,15 @@ func PrintContextLine(line Line) {
 		line.Text[:line.MatchIndex],
 		red(line.Text[line.MatchIndex:line.MatchEndIndex]),
 		line.Text[line.MatchEndIndex:])
+}
+
+// PrintPatternLine pretty-prints the regex used to find the leak
+func PrintPatternLine(match Match) {
+	fmt.Printf("RegEx pattern: %s\n", match.Expression)
+}
+
+func PrintKeywordType(match Match) {
+	fmt.Printf("RegEx pattern: %s\n", match.KeywordType)
 }
 
 // Entropy calculates the Shannon entropy of a string

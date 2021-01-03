@@ -12,9 +12,9 @@
       "program": "${file}",
       "args": [
         "searchKeyword",
-        "tillsongalloway.com",
+        "weka.io",
         "--regex-file",
-        "regexes.txt"
+        "regexes_example.txt"
       ]
     }
   ]
