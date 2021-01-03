@@ -248,11 +248,11 @@ func PrintContextLine(line Line) {
 
 // PrintPatternLine pretty-prints the regex used to find the leak
 func PrintPatternLine(match Match) {
-	fmt.Printf("RegEx pattern: %s\n", match.Expression)
+	fmt.Printf("RegEx Pattern: %s\n", match.Expression)
 }
 
 func PrintKeywordType(match Match) {
-	fmt.Printf("RegEx pattern: %s\n", match.KeywordType)
+	fmt.Printf("Keyword Type: %s\n", match.KeywordType)
 }
 
 // Entropy calculates the Shannon entropy of a string
