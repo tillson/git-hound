@@ -10,7 +10,12 @@
       "request": "launch",
       "mode": "debug",
       "program": "${file}",
-      "args": ["searchKeyword", "tillsongalloway.com"]
+      "args": [
+        "searchKeyword",
+        "tillsongalloway.com",
+        "--regex-file",
+        "regexes.txt"
+      ]
     }
   ]
 }

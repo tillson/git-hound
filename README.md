@@ -9,12 +9,12 @@ More information on methodologies is available in the [accompanying blog post](h
 
 ## Features
 
-* GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
-* Generic API key detection using pattern matching, context, [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>), and other heuristics
-* Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)
-* Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging
-* Base64 detection and decoding
-* Options to build GitHound into your workflow, like custom regexes and results-only output mode
+- GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
+- Generic API key detection using pattern matching, context, [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>), and other heuristics
+- Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)
+- Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging
+- Base64 detection and decoding
+- Options to build GitHound into your workflow, like custom regexes and results-only output mode
 
 ## Usage
 
@@ -46,11 +46,12 @@ For detecting future API key leaks, GitHub offers [Push Token Scanning](https://
 
 ### Bug Bounty Hunters: Searching for leaked employee API tokens
 
-My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results`  hack and `--languages` flag are useful for scraping >100 pages of results.
+My primary use for GitHound is for finding sensitive information for Bug Bounty programs. For high-profile targets, the `--many-results` hack and `--languages` flag are useful for scraping >100 pages of results.
 
 `echo "\"uberinternal.com\"" | githound --dig-files --dig-commits --many-results --languages common-languages.txt --threads 100`
 
 ## How does GitHound find API keys?
+
 https://github.com/tillson/git-hound/blob/master/internal/app/keyword_scan.go
 GitHound finds API keys with a combination of exact regexes for common services like Slack and AWS and a context-sensitive generic API regex. This finds long strings that look like API keys surrounded by keywords like "Authorization" and "API-Token". GitHound assumes that these are false positives and then proves their legitimacy with Shannon entropy, dictionary word checks, uniqueness calculations, and encoding detection. GitHound then outputs high certainty positives.
 For files that encode secrets, decodes base64 strings and searches the encoded strings for API keys.
@@ -59,33 +60,44 @@ Check out this [blog post](https://tillsongalloway.com/finding-sensitive-informa
 
 ## Flags
 
-* `--subdomain-file` - The file with the subdomains
-* `--dig-files` - Clone and search the repo's files for results
-* `--dig-commits` - Clone and search the repo's commit history for results
-* `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
-* `--results-only` - Print only regexed results to stdout. Useful for piping custom regex matches into another script
-* `--no-repos` - Don't search repos
-* `--no-gists` - Don't search Gists
-* `--threads` - Specify max number of threads for the commit digger to use.
-* `--regex-file` - Supply a custom regex file
-* `--language-file` - Supply a custom file with languages to search.
-* `--config-file` - Custom config file (default is `config.yml`)
-* `--pages` - Max pages to search (default is 100, the page maximum)
-* `--no-scoring` - Don't use scoring to filter out false positives
-* `--no-api-keys` - Don't perform generic API key searching. GitHound uses common API key patterns, context clues, and a Shannon entropy filter to find potential exposed API keys.
-* `--no-files` - Don't flag interesting file extensions
-* `--only-filtered` - Only search filtered queries (languages)
-* `--debug` - Print verbose debug messages.
-* `--otp-code` - Github account 2FA code for sign-in. (Only use if you have authenticator 2FA setup on your Github account)
+- `--subdomain-file` - The file with the subdomains
+- `--dig-files` - Clone and search the repo's files for results
+- `--dig-commits` - Clone and search the repo's commit history for results
+- `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
+- `--results-only` - Print only regexed results to stdout. Useful for piping custom regex matches into another script
+- `--no-repos` - Don't search repos
+- `--no-gists` - Don't search Gists
+- `--threads` - Specify max number of threads for the commit digger to use.
+- `--regex-file` - Supply a custom regex file
+- `--language-file` - Supply a custom file with languages to search.
+- `--config-file` - Custom config file (default is `config.yml`)
+- `--pages` - Max pages to search (default is 100, the page maximum)
+- `--no-scoring` - Don't use scoring to filter out false positives
+- `--no-api-keys` - Don't perform generic API key searching. GitHound uses common API key patterns, context clues, and a Shannon entropy filter to find potential exposed API keys.
+- `--no-files` - Don't flag interesting file extensions
+- `--only-filtered` - Only search filtered queries (languages)
+- `--debug` - Print verbose debug messages.
+- `--otp-code` - Github account 2FA code for sign-in. (Only use if you have authenticator 2FA setup on your Github account)
+
+### Sending flags on VS Code
+
+On launch.json send the needed flags as args
+"args": [
+"searchKeyword",
+"tillsongalloway.com",
+"--regex-file",
+"regexes.txt"
+]
 
 ## User feedback
+
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
 [List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
 
-
 ## Sponsoring
+
 If GitHound helped you earn a big bounty, consider sending me a tip with GitHub Sponsors.
 
 ## References
 
-* [How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories (Meli, McNiece, Reaves)](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf)
+- [How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories (Meli, McNiece, Reaves)](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf)
