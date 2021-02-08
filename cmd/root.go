@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
 )
@@ -49,13 +51,17 @@ var rootCmd = &cobra.Command{
 		}
 
 		var queries []string
+		if cmd.Flag("regex-file").Value.String() != "" {
+			fmt.Println(cmd.Flag("regex-file").Value.String())
+		}
+
 		if cmd.Flag("subdomain-file").Value.String() != "" {
 			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
 				queries = append(queries, query)
 			}
 		} else {
 			if !terminal.IsTerminal(0) {
-				scanner := bufio.NewScanner(os.Stdin)
+				scanner := getScanner(args)
 				for scanner.Scan() {
 					bytes := scanner.Bytes()
 					str := string(bytes)
@@ -100,6 +106,14 @@ var rootCmd = &cobra.Command{
 			color.Green("Finished.")
 		}
 	},
+}
+
+func getScanner(args []string) *bufio.Scanner {
+	if args[0] == "searchKeyword" {
+		return bufio.NewScanner(strings.NewReader(args[1]))
+	} else {
+		return bufio.NewScanner(os.Stdin)
+	}
 }
 
 // Execute command
