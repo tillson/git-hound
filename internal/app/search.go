@@ -80,7 +80,13 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 func SearchGitHub(query string, options SearchOptions, client *http.Client, results *[]RepoSearchResult, resultSet map[string]bool) (err error) {
 	// TODO: A lot of this code is shared between GitHub and Gist searches,
 	// so we should rework the logic
-	base := "https://github.com/search"
+	base := ""
+	if GetFlags().GithubRepo {
+		base = "https://github.com/" + query + "/search"
+	} else {
+		base = "https://github.com/search"
+	}
+
 	page, pages := 0, 1
 	var delay = 5
 	orders := []string{"asc"}

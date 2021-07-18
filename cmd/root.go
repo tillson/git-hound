@@ -24,6 +24,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GithubRepo, "github-repo", false, "Search in a specific Github Repo only.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().ResultsOnly, "results-only", false, "Only print match strings.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoAPIKeys, "no-api-keys", false, "Don't search for generic API keys.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoScoring, "no-scoring", false, "Don't use scoring to filter out false positives.")
@@ -108,7 +109,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func getScanner(args []string, cmd *cobra.Command) *bufio.Scanner {
+func getScanner(args []string) *bufio.Scanner {
 	if len(args) == 2 {
 		if args[0] == "searchKeyword" {
 			return bufio.NewScanner(strings.NewReader(args[1]))
