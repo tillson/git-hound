@@ -108,7 +108,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func getScanner(args []string, cmd *cobra.Command) *bufio.Scanner {
+func getScanner(args []string) *bufio.Scanner {
 	if len(args) == 2 {
 		if args[0] == "searchKeyword" {
 			return bufio.NewScanner(strings.NewReader(args[1]))
