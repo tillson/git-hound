@@ -108,12 +108,13 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func getScanner(args []string) *bufio.Scanner {
-	if args[0] == "searchKeyword" {
-		return bufio.NewScanner(strings.NewReader(args[1]))
-	} else {
-		return bufio.NewScanner(os.Stdin)
+func getScanner(args []string, cmd *cobra.Command) *bufio.Scanner {
+	if len(args) == 2 {
+		if args[0] == "searchKeyword" {
+			return bufio.NewScanner(strings.NewReader(args[1]))
+		}
 	}
+	return bufio.NewScanner(os.Stdin)
 }
 
 // Execute command
