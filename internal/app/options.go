@@ -9,6 +9,7 @@ type Flags struct {
 	LanguageFile  string
 	ConfigFile    string
 	Pages         int
+	GithubRepo    bool
 	ResultsOnly   bool
 	NoAPIKeys     bool
 	NoScoring     bool
