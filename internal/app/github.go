@@ -126,7 +126,7 @@ func GrabCSRFToken(csrfURL string, client *http.Client) (token string, err error
 
 // GrabCSRFTokenBody grabs the CSRF token from a GitHub page
 func GrabCSRFTokenBody(pageBody string) (token string, err error) {
-	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+]{32,})\"")
+	re := regexp.MustCompile("authenticity_token\"\\svalue\\=\"([0-9A-z/=\\+\\-_]{32,})\"")
 	match := re.FindStringSubmatch(pageBody)
 	if len(match) == 2 {
 		return match[1], err
