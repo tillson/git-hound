@@ -1,0 +1,1 @@
+echo "hanureddy022@gmail.com filename:search_test.go" | ./git-hound
