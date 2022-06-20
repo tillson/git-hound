@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -234,6 +235,15 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if change == nil {
 			continue
 		}
+		//temporary response to:  https://github.com/sergi/go-diff/issues/89
+		//reference: https://github.com/codeEmitter/gitrob/commit/c735767e86d40a0015756a299e4daeb136c7126b
+		defer func() error {
+			if err := recover(); err != nil {
+				return errors.New(fmt.Sprintf("Panic occurred while retrieving change content: %s", err))
+			}
+			return nil
+		}()
+
 		patch, err := change.Patch()
 		if err != nil {
 			if GetFlags().Debug {

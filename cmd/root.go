@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
 
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
 )
@@ -22,6 +24,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GithubRepo, "github-repo", false, "Search in a specific Github Repo only.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().ResultsOnly, "results-only", false, "Only print match strings.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoAPIKeys, "no-api-keys", false, "Don't search for generic API keys.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoScoring, "no-scoring", false, "Don't use scoring to filter out false positives.")
@@ -49,13 +52,17 @@ var rootCmd = &cobra.Command{
 		}
 
 		var queries []string
+		if cmd.Flag("regex-file").Value.String() != "" {
+			fmt.Println(cmd.Flag("regex-file").Value.String())
+		}
+
 		if cmd.Flag("subdomain-file").Value.String() != "" {
 			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
 				queries = append(queries, query)
 			}
 		} else {
 			if !terminal.IsTerminal(0) {
-				scanner := bufio.NewScanner(os.Stdin)
+				scanner := getScanner(args)
 				for scanner.Scan() {
 					bytes := scanner.Bytes()
 					str := string(bytes)
@@ -100,6 +107,15 @@ var rootCmd = &cobra.Command{
 			color.Green("Finished.")
 		}
 	},
+}
+
+func getScanner(args []string) *bufio.Scanner {
+	if len(args) == 2 {
+		if args[0] == "searchKeyword" {
+			return bufio.NewScanner(strings.NewReader(args[1]))
+		}
+	}
+	return bufio.NewScanner(os.Stdin)
 }
 
 // Execute command
