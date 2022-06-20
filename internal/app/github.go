@@ -178,7 +178,7 @@ func GetRawGistPage(client *http.Client, gist string) string {
 		log.Fatal(err)
 	}
 	escaped := regexp.QuoteMeta(gist)
-	regex := regexp.MustCompile("href\\=\"\\/(" + escaped + "\\/raw\\/[0-9a-z]{40}\\/[\\w_\\-\\.\\/\\%]{1,255})\"\\>")
+	regex := regexp.MustCompile("href\\=\"\\/(" + escaped + "\\/raw\\/[0-9a-z]{40}\\/[\\w_\\-\\.\\/\\%]{1,255})\"")
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Fatal(err)
