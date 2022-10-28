@@ -61,6 +61,7 @@ Check out this [blog post](https://tillsongalloway.com/finding-sensitive-informa
 ## Flags
 
 - `--subdomain-file` - The file with the subdomains
+- `--json` - Output results as JSON objects
 - `--dig-files` - Clone and search the repo's files for results
 - `--dig-commits` - Clone and search the repo's commit history for results
 - `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
