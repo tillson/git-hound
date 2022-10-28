@@ -22,6 +22,7 @@ type Flags struct {
 	NoRepos       bool
 	ManyResults   bool
 	OTPCode       string
+	JsonOutput    bool
 }
 
 var flags Flags

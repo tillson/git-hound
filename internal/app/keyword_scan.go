@@ -2,6 +2,7 @@ package app
 
 import (
 	b64 "encoding/base64"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -63,8 +64,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	}
 
 	if len(matches) > 0 {
-		if !GetFlags().ResultsOnly {
-			resultRepoURL := GetRepoURLForSearchResult(repo)
+		resultRepoURL := GetRepoURLForSearchResult(repo)
+		if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 			color.Green("[" + resultRepoURL + "]")
 		}
 		for _, result := range matches {
@@ -77,10 +78,21 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			if GetFlags().ResultsOnly {
 				fmt.Println(result.Text)
 			} else {
-				PrintContextLine(result.Line)
-				PrintPatternLine(result)
-				PrintKeywordType(result)
-				PrintResultLink(repo, result)
+				if GetFlags().JsonOutput {
+					a, _ := json.Marshal(map[string]string{
+						"repo":    resultRepoURL,
+						"result":  result.Line.Text,
+						"type":    result.KeywordType,
+						"pattern": result.Expression,
+						"url":     GetResultLink(repo, result),
+					})
+					fmt.Println(string(a))
+				} else {
+					PrintContextLine(result.Line)
+					PrintPatternLine(result)
+					PrintKeywordType(result)
+					color.New(color.Faint).Println(GetResultLink(repo, result))
+				}
 			}
 		}
 	}
@@ -271,16 +283,16 @@ func Entropy(str string) (entropy float32) {
 	return entropy
 }
 
-// PrintResultLink prints a link to the result.
-func PrintResultLink(result RepoSearchResult, match Match) {
+// GetResultLink returns a link to the result.
+func GetResultLink(result RepoSearchResult, match Match) string {
 	if match.Commit != "" {
-		color.New(color.Faint).Println("https://github.com/" + result.Repo + "/commit/" + match.Commit)
+		return "https://github.com/" + result.Repo + "/commit/" + match.Commit
 	} else {
 		file := match.File
 		if file == "" {
 			file = result.File
 		}
-		color.New(color.Faint).Println(result.URL)
+		return result.URL
 	}
 }
 
