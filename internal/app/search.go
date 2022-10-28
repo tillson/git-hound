@@ -139,13 +139,13 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							}
 							pages = newPages
 							if pages > 99 && GetFlags().ManyResults {
-								if !GetFlags().ResultsOnly {
+								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 									color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
 								}
 								orders = append(orders, "desc")
 								rankings = append(orders, "")
 							} else {
-								if !GetFlags().ResultsOnly {
+								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 									color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
 								}
 							}
@@ -236,11 +236,11 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					}
 					pages = newPages
 					if pages > 99 {
-						if !GetFlags().ResultsOnly {
+						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 							color.Cyan("[*] Searching 100+ pages of Gist results for '" + query + "'...")
 						}
 					} else {
-						if !GetFlags().ResultsOnly {
+						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
 						}
 					}

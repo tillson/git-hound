@@ -81,9 +81,9 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				if GetFlags().JsonOutput {
 					a, _ := json.Marshal(map[string]string{
 						"repo":    resultRepoURL,
-						"result":  result.Line.Text,
+						"context": result.Line.Text,
+						"match":   result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
 						"type":    result.KeywordType,
-						"pattern": result.Expression,
 						"url":     GetResultLink(repo, result),
 					})
 					fmt.Println(string(a))

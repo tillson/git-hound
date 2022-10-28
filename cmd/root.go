@@ -89,7 +89,7 @@ var rootCmd = &cobra.Command{
 			color.Red("[!] Unable to login to GitHub.")
 			os.Exit(1)
 		}
-		if !app.GetFlags().ResultsOnly {
+		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
 			color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
 		}
 
