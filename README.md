@@ -1,20 +1,20 @@
 # GitHound
 
-A batch-catching, pattern-matching, patch-attacking secret snatcher.
+A batch-catching, pattern-matching, patch-attacking secret snatcher that searches all of GitHub using code search.
 
 ![GitHound](assets/logo.png)
 
-GitHound pinpoints exposed API keys and other sensitive information across all of GitHub using pattern matching, commit history searching, and a unique result scoring system. GitHound has earned me over $7500 applied to Bug Bounty research. Corporate and Bug Bounty Hunter use cases are outlined below.
-More information on methodologies is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
+GitHound pinpoints exposed API keys and other sensitive information on GitHub using pattern matching, commit history searching, and a unique result scoring system. Unlike other secret-finding tools, GitHound takes advantage of GitHub's code search feature to search all of GitHub and isn't limited to specific repos, users, or orgs.
+More information is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
 
 - GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
-- Generic API key detection using pattern matching, context, [Shannon entropy](<https://en.wikipedia.org/wiki/Entropy_(information_theory)>), and other heuristics
+- Sensitive data detection using pattern matching, contextual information, and string entropy
 - Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)
 - Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging
 - Base64 detection and decoding
-- Options to build GitHound into your workflow, like custom regexes and results-only output mode
+- Options to build GitHound into your workflow, including JSON output and custom regexes
 
 ## Usage
 
@@ -33,6 +33,9 @@ If GitHound is logged into your GitHub account, two-factor authentication may ki
 Otherwise, GitHound will prompt you for it when it starts up.
 You can also [supply your 2FA seed](https://github.com/tillson/git-hound/pull/24) in the config and you'll never have to worry about 2FA again.
 Grab the 2FA seed by decoding the barcode that GitHub shows during the 2FA setup process.
+
+## API Key Regexes
+GitHound utilizes a database of API key regexes maintained by the [Gitleaks](https://github.com/zricethezav/gitleaks) authors. Gitleaks is a production-grade tool for detecting secrets in known repositories and proactively protecting developers from committing secrets. 
 
 ## Use cases
 
@@ -92,7 +95,7 @@ On launch.json send the needed flags as args
 
 ## Building the project
 
-From the main folder: go build .
+From the main folder: `go build .`
 
 ## User feedback
 

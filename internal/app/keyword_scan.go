@@ -117,25 +117,28 @@ func MatchKeywords(source string) (matches []Match) {
 			}
 		}
 	}
-
-	regexString := "(?i)\\b(sf_username|AKIA" +
-		// "[\\.\b][A-z0-9\\-]{1,256}\\." +
-		// regexp.QuoteMeta(result.Query) +
-		"|db_username|db_password" +
-		"|hooks\\.slack\\.com|pt_token|full_resolution_time_in_minutes" +
-		"|xox[a-zA-Z]-[a-zA-Z0-9-]+" +
-		"|s3\\.console\\.aws\\.amazon\\.com\\/s3\\/buckets|" +
-		"id_rsa|pg_pass)\\b" //|[\\w\\.=-]+@" + regexp.QuoteMeta(result.Query) + ")\\b"
-	regex = regexp.MustCompile(regexString)
-	matchStrings := regex.FindAllString(source, -1)
-	for _, match := range matchStrings {
-		matches = append(matches, Match{
-			KeywordType: "keyword",
-			Text:        string(match),
-			Expression:  regex.String(),
-			Line:        GetLine(source, match),
-		})
+	// loop over regexes from database
+	for _, regex := range GetFlags().TextRegexes.Rules {
+		regexp := regex.Regex.RegExp
+		matchStrings := regexp.FindAllString(source, -1)
+		for _, match := range matchStrings {
+			shouldMatch := !regex.SmartFiltering
+			if regex.SmartFiltering {
+				if Entropy(match) > 3.5 {
+					shouldMatch = !(containsSequence(match) || containsCommonWord(match))
+				}
+			}
+			if shouldMatch {
+				matches = append(matches, Match{
+					KeywordType: regex.Name,
+					Text:        string(match),
+					Expression:  regexp.String(),
+					Line:        GetLine(source, match),
+				})
+			}
+		}
 	}
+
 	return matches
 }
 
@@ -156,26 +159,6 @@ func MatchAPIKeys(source string) (matches []Match) {
 			for _, decodedMatch := range decodedMatches {
 				matches = append(matches, decodedMatch)
 			}
-		}
-	}
-
-	regexString := "(?i)(ACCESS|SECRET|LICENSE|CRYPT|PASS|API|ADMIN|TOKEN|PWD|Authorization|Bearer)[\\w\\s:=\"']{0,10}[=:\\s'\"]([\\w\\-+=]{32,})\\b"
-	regex = regexp.MustCompile(regexString)
-	matchStrings := regex.FindAllStringSubmatch(source, -1)
-	for _, match := range matchStrings {
-		if Entropy(match[2]) > 3.5 {
-			if containsSequence(match[2]) {
-				continue
-			}
-			if containsCommonWord(match[2]) {
-				continue
-			}
-			matches = append(matches, Match{
-				KeywordType: "apiKey",
-				Text:        string(match[2]),
-				Expression:  regex.String(),
-				Line:        GetLine(source, match[2]),
-			})
 		}
 	}
 	return matches
@@ -322,15 +305,6 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 		for _, match := range MatchAPIKeys(source) {
 			matches = append(matches, match)
 			score += 2
-		}
-	}
-	if GetFlags().RegexFile != "" {
-		if !loadedRegexes {
-			initializeCustomRegexes()
-		}
-		for _, match := range MatchCustomRegex(source) {
-			matches = append(matches, match)
-			score += 4
 		}
 	}
 	if !GetFlags().NoScoring {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/BurntSushi/toml"
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
@@ -20,7 +21,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SubdomainFile, "subdomain-file", "", "A file containing a list of subdomains (or other queries).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "", "Supply your own list of regexes.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "", "Path to a list of regexes.")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
@@ -53,9 +54,6 @@ var rootCmd = &cobra.Command{
 		}
 
 		var queries []string
-		if cmd.Flag("regex-file").Value.String() != "" {
-			fmt.Println(cmd.Flag("regex-file").Value.String())
-		}
 
 		if cmd.Flag("subdomain-file").Value.String() != "" {
 			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
@@ -92,7 +90,7 @@ var rootCmd = &cobra.Command{
 		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
 			color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
 		}
-
+		toml.DecodeFile(app.GetFlags().RegexFile, &app.GetFlags().TextRegexes)
 		for _, query := range queries {
 			_, err = app.Search(query, client)
 			if err != nil {

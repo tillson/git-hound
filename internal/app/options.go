@@ -21,8 +21,9 @@ type Flags struct {
 	NoGists       bool
 	NoRepos       bool
 	ManyResults   bool
-	OTPCode       string
 	JsonOutput    bool
+	OTPCode       string
+	TextRegexes   config
 }
 
 var flags Flags

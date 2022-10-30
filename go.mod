@@ -3,6 +3,7 @@ module github.com/tillson/git-hound
 go 1.12
 
 require (
+	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20220517143526-88bb52951d5b // indirect
 	github.com/boombuler/barcode v1.0.1 // indirect
