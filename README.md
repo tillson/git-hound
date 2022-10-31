@@ -1,6 +1,6 @@
 # GitHound
 
-A batch-catching, pattern-matching, patch-attacking secret snatcher that searches all of GitHub using code search.
+A batch-catching, pattern-matching, patch-attacking secret snatcher.
 
 ![GitHound](assets/logo.png)
 
