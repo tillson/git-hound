@@ -5987,6 +5987,7 @@ func getProgrammingWords() []string {
 		"cconstant",
 		"nsautoreleasepool",
 		"nocomparison",
+		"comparison",
 		"alias_method",
 		"rundisplay",
 		"clojars",
@@ -7700,5 +7701,7 @@ func getProgrammingWords() []string {
 		"inputtype",
 		"raiseglobalerror",
 		"dialogresult",
+		"suggestions",
+		"...",
 	}
 }

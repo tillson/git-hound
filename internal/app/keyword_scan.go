@@ -368,7 +368,7 @@ func containsCommonWord(str string) bool {
 }
 
 func containsSequence(str string) bool {
-	b := []byte(str)
+	b := []byte(strings.ToLower(str))
 	matches := 0
 	for i := 1; i < len(b); i++ {
 		if b[i] == b[i-1] || b[i] == b[i-1]-1 || b[i] == b[i-1]+1 {
