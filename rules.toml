@@ -1,7 +1,7 @@
 [[rules]]
 description = "Generic API Key"
 id = "generic-api-key"
-smart_filtering = true # GitHound code that uses entropy/common words to reduce false positives
+smart_filtering = true # GitHound code that removes common words/low entropy strings/repeating sequences to reduce false positives
 regex = '''(?i)(?:key|api|token|secret|client|passwd|password|auth|access)(?:[0-9a-z\-_\t .]{0,20})(?:[\s|']|[\s|"]){0,3}(?:=|>|:=|\|\|:|<=|=>|:)(?:'|\"|\s|=|\x60){0,5}([0-9a-z\-_.=]{10,150})(?:['|\"|\n|\r|\s|\x60|;]|$)'''
 
 # The following rules are from GitLeaks (https://github.com/zricethezav/gitleaks), which is released under an MIT license (https://github.com/zricethezav/gitleaks/blob/master/LICENSE)

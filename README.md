@@ -35,7 +35,7 @@ You can also [supply your 2FA seed](https://github.com/tillson/git-hound/pull/24
 Grab the 2FA seed by decoding the barcode that GitHub shows during the 2FA setup process.
 
 ## API Key Regexes
-GitHound utilizes a database of API key regexes maintained by the [Gitleaks](https://github.com/zricethezav/gitleaks) authors. Gitleaks is a production-grade tool for detecting secrets in known repositories and proactively protecting developers from committing secrets. 
+GitHound utilizes a database of API key regexes maintained by the [Gitleaks](https://github.com/zricethezav/gitleaks) authors.
 
 ## Use cases
 
@@ -65,6 +65,8 @@ Check out this [blog post](https://tillsongalloway.com/finding-sensitive-informa
 
 - `--subdomain-file` - The file with the subdomains
 - `--json` - Output results as JSON objects
+- `--regex-file` - Supply a custom regex file (default is `rules.toml`)
+- `--config-file` - Custom config file (default is `config.yml`)
 - `--dig-files` - Clone and search the repo's files for results
 - `--dig-commits` - Clone and search the repo's commit history for results
 - `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
@@ -72,9 +74,7 @@ Check out this [blog post](https://tillsongalloway.com/finding-sensitive-informa
 - `--no-repos` - Don't search repos
 - `--no-gists` - Don't search Gists
 - `--threads` - Specify max number of threads for the commit digger to use.
-- `--regex-file` - Supply a custom regex file
 - `--language-file` - Supply a custom file with languages to search.
-- `--config-file` - Custom config file (default is `config.yml`)
 - `--pages` - Max pages to search (default is 100, the page maximum)
 - `--no-scoring` - Don't use scoring to filter out false positives
 - `--no-api-keys` - Don't perform generic API key searching. GitHound uses common API key patterns, context clues, and a Shannon entropy filter to find potential exposed API keys.
