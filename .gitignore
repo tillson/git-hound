@@ -1,3 +1,5 @@
 config.yml
 git-hound
 .goreleaser.yaml
+
+dist/
