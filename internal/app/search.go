@@ -35,6 +35,7 @@ type NewSearchPayload struct {
 			// Repository struct {
 			// }
 		} `json:"results"`
+		PageCount int `json:"page_count"`
 	} `json:"payload"`
 }
 
@@ -145,7 +146,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					if err != nil {
 						log.Fatal(err)
 					}
-					if len(match) == 2 {
+					if match != nil && len(match) == 2 {
 						newPages, err := strconv.Atoi(match[1])
 						if err == nil {
 							if newPages > GetFlags().Pages {
@@ -188,18 +189,17 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					var resultPayload NewSearchPayload
 					// fmt.Println(match[1])
 					json.Unmarshal([]byte(match[1]), &resultPayload)
+					if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+						if pages != resultPayload.Payload.PageCount {
+							color.Cyan("[*] Searching " + strconv.Itoa(resultPayload.Payload.PageCount) + " pages of results for '" + query + "'...")
+						}
+						pages = resultPayload.Payload.PageCount
+					}
 					for _, result := range resultPayload.Payload.Results {
 						if resultSet[(result.RepoName+result.Path)] == true {
 							continue
 						}
 						resultSet[(result.RepoName + result.Path)] = true
-						if GetFlags().PopulateWatchlist {
-							// fmt.Println(strings.Split(element[2], "/")[0])
-							_, err := db.Exec("INSERT OR IGNORE INTO tracked_users (username, last_event_id, affiliation) VALUES (?, ?, ?);", strings.Split(result.RepoName, "/")[0], 0, query)
-							if err != nil {
-								fmt.Println(err)
-							}
-						}
 						go ScanAndPrintResult(client, RepoSearchResult{
 							Repo:   result.RepoName,
 							File:   result.Path,
@@ -210,23 +210,24 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 						})
 					}
 				} else {
-				for _, element := range matches {
-					if len(element) == 5 {
-						if resultSet[(element[2]+"/"+element[3])] == true {
-							continue
-						}
-						resultSet[(element[2] + "/" + element[3])] = true
-						go ScanAndPrintResult(client, RepoSearchResult{
-							Repo:   element[2],
-							File:   element[4],
+					for _, element := range matches {
+						if len(element) == 5 {
+							if resultSet[(element[2]+"/"+element[3])] == true {
+								continue
+							}
+							resultSet[(element[2] + "/" + element[3])] = true
+							go ScanAndPrintResult(client, RepoSearchResult{
+								Repo:   element[2],
+								File:   element[4],
 								Raw:    "https://raw.githubusercontent.com/" + element[2] + "/" + element[3],
-							Source: "repo",
-							Query:  query,
-							URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
-						})
+								Source: "repo",
+								Query:  query,
+								URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
+							})
+						}
 					}
+					time.Sleep(time.Duration(delay) * time.Second)
 				}
-				time.Sleep(time.Duration(delay) * time.Second)
 			}
 		}
 	}
