@@ -200,7 +200,11 @@ func ConstructSearchURL(base string, query string, options SearchOptions) string
 	// sb.WriteString("&o=desc")    // + options.Order)
 	sb.WriteString("&s=indexed") // + options.Sort)
 	sb.WriteString("&l=" + options.Language)
-	sb.WriteString("&type=Code")
+	if GetFlags().LegacySearch {
+		sb.WriteString("&type=codelegacy")
+	} else {
+		sb.WriteString("&type=code")
+	}
 	return sb.String()
 }
 

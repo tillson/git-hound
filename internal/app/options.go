@@ -18,6 +18,7 @@ type Flags struct {
 	OnlyFiltered  bool
 	Threads       int
 	Debug         bool
+	LegacySearch  bool
 	NoGists       bool
 	NoRepos       bool
 	ManyResults   bool

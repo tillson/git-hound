@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -22,6 +23,20 @@ type RepoSearchResult struct {
 	Query         string
 	URL           string
 	searchOptions *SearchOptions
+}
+
+type NewSearchPayload struct {
+	Payload struct {
+		Results []struct {
+			FileName      string `json:"filename"`
+			RepoName      string `json:"repo_name"`
+			Path          string `json:"path"`
+			DefaultBranch string `json:"repo_default_branch"`
+			// Repository struct {
+			// }
+		} `json:"results"`
+		PageCount int `json:"page_count"`
+	} `json:"payload"`
 }
 
 // Search Everything
@@ -97,7 +112,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				continue
 			}
 			for page < pages {
-				options.Page = (page + 1)
 				str := ConstructSearchURL(base, query, options)
 				// fmt.Println(str)
 				response, err := client.Get(str)
@@ -125,66 +139,108 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					log.Fatal(err)
 				}
 				response.Body.Close()
+
+				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
+				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
+
 				if page == 0 {
-					regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
-					match := regex.FindStringSubmatch(responseStr)
-					if err != nil {
-						log.Fatal(err)
-					}
-					if len(match) == 2 {
-						newPages, err := strconv.Atoi(match[1])
-						if err == nil {
-							if newPages > GetFlags().Pages {
-								newPages = GetFlags().Pages
+					if len(matches) == 0 {
+						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+						match := resultRegex.FindStringSubmatch(responseStr)
+						// fmt.Println(smatch)
+						var resultPayload NewSearchPayload
+						// fmt.Println(match[1])
+						json.Unmarshal([]byte(match[1]), &resultPayload)
+						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+							if pages != resultPayload.Payload.PageCount {
+								color.Cyan("[*] Searching " + strconv.Itoa(resultPayload.Payload.PageCount) + " pages of results for '" + query + "'...")
 							}
-							pages = newPages
-							if pages > 99 && GetFlags().ManyResults {
-								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-									color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
-								}
-								orders = append(orders, "desc")
-								rankings = append(orders, "")
-							} else {
-								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-									color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
-								}
-							}
-						} else {
-							color.Red("[!] An error occurred while parsing the page count.")
-							fmt.Println(err)
+							pages = resultPayload.Payload.PageCount
 						}
 					} else {
-						if strings.Index(responseStr, "Sign in to GitHub") > -1 {
-							color.Red("[!] Unable to log into GitHub.")
-							log.Fatal()
+						regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
+						match := regex.FindStringSubmatch(responseStr)
+						if err != nil {
+							log.Fatal(err)
+						}
+						if len(match) == 2 {
+							newPages, err := strconv.Atoi(match[1])
+							if err == nil {
+								if newPages > GetFlags().Pages {
+									newPages = GetFlags().Pages
+								}
+								pages = newPages
+								if pages > 99 && GetFlags().ManyResults {
+									if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+										color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+									}
+									orders = append(orders, "desc")
+									rankings = append(orders, "")
+								} else {
+									if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+										color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+									}
+								}
+							} else {
+								color.Red("[!] An error occurred while parsing the page count.")
+								fmt.Println(err)
+							}
 						} else {
-							if !GetFlags().ResultsOnly {
-								color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+							if strings.Index(responseStr, "Sign in to GitHub") > -1 {
+								color.Red("[!] Unable to log into GitHub.")
+								log.Fatal()
+							} else if len(matches) > 0 {
+								if !GetFlags().ResultsOnly {
+									color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+								}
 							}
 						}
 					}
 				}
 				page++
-				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
-				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
-				for _, element := range matches {
-					if len(element) == 5 {
-						if resultSet[(element[2]+"/"+element[3])] == true {
+				if len(matches) == 0 {
+					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+					match := resultRegex.FindStringSubmatch(responseStr)
+					// fmt.Println(smatch)
+					var resultPayload NewSearchPayload
+					// fmt.Println(match[1])
+					json.Unmarshal([]byte(match[1]), &resultPayload)
+					for _, result := range resultPayload.Payload.Results {
+						if resultSet[(result.RepoName+result.Path)] == true {
 							continue
 						}
-						resultSet[(element[2] + "/" + element[3])] = true
+						resultSet[(result.RepoName + result.Path)] = true
 						go ScanAndPrintResult(client, RepoSearchResult{
-							Repo:   element[2],
-							File:   element[4],
-							Raw:    element[2] + "/master/" + element[4],
+							Repo:   result.RepoName,
+							File:   result.Path,
+							Raw:    "https://raw.githubusercontent.com/" + result.RepoName + "/" + result.DefaultBranch + "/" + result.Path,
 							Source: "repo",
 							Query:  query,
-							URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
+							URL:    "https://github.com/" + result.RepoName + "/blob/" + result.DefaultBranch + "/" + result.Path,
 						})
 					}
+				} else {
+					for _, element := range matches {
+						if len(element) == 5 {
+							if resultSet[(element[2]+"/"+element[3])] == true {
+								continue
+							}
+							resultSet[(element[2] + "/" + element[3])] = true
+							go ScanAndPrintResult(client, RepoSearchResult{
+								Repo:   element[2],
+								File:   element[4],
+								Raw:    "https://raw.githubusercontent.com/" + element[2] + "/" + element[3],
+								Source: "repo",
+								Query:  query,
+								URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
+							})
+						}
+					}
+					time.Sleep(time.Duration(delay) * time.Second)
 				}
-				time.Sleep(time.Duration(delay) * time.Second)
+				options.Page = (page + 1)
 			}
+
 		}
 	}
 	return nil
