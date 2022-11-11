@@ -62,27 +62,37 @@ For files that encode secrets, decodes base64 strings and searches the encoded s
 Check out this [blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/) for more details on use cases and methodologies.
 
 ## Flags
+```
+Usage:
+  githound [flags]
 
-- `--subdomain-file` - The file with the subdomains
-- `--json` - Output results as JSON objects
-- `--regex-file` - Supply a custom regex file (default is `rules.toml`)
-- `--config-file` - Custom config file (default is `config.yml`)
-- `--dig-files` - Clone and search the repo's files for results
-- `--dig-commits` - Clone and search the repo's commit history for results
-- `--many-results` - Use result sorting and filtering hack to scrape more than 100 pages of results
-- `--results-only` - Print only regexed results to stdout. Useful for piping custom regex matches into another script
-- `--no-repos` - Don't search repos
-- `--no-gists` - Don't search Gists
-- `--threads` - Specify max number of threads for the commit digger to use.
-- `--language-file` - Supply a custom file with languages to search.
-- `--pages` - Max pages to search (default is 100, the page maximum)
-- `--no-scoring` - Don't use scoring to filter out false positives
-- `--no-api-keys` - Don't perform generic API key searching. GitHound uses common API key patterns, context clues, and a Shannon entropy filter to find potential exposed API keys.
-- `--no-files` - Don't flag interesting file extensions
-- `--only-filtered` - Only search filtered queries (languages)
-- `--debug` - Print verbose debug messages.
-- `--otp-code` - Github account 2FA code for sign-in. (Only use if you have authenticator 2FA setup on your Github account)
+Flags:
+      --config-file string      Supply the path to a config file.
+      --debug                   Enables verbose debug logging.
+      --dig-commits             Dig through commit history to find more secrets (CPU intensive).
+      --dig-files               Dig through the repo's files to find more secrets (CPU intensive).
+      --filtered-only           Only print filtered results (language files)
+      --github-repo             Search in a specific Github Repo only.
+  -h, --help                    help for githound
+      --json                    Print results in JSON format
+      --language-file string    Supply your own list of languages to search (java, python).
+      --legacy                  Use the legacy search method.
+      --many-results            Search >100 pages with filtering hack
+      --no-api-keys             Don't search for generic API keys.
+      --no-files                Don't search for interesting files.
+      --no-gists                Don't search Gists
+      --no-keywords             Don't search for built-in keywords
+      --no-repos                Don't search repos
+      --no-scoring              Don't use scoring to filter out false positives.
+      --otp-code string         Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)
+      --pages int               Maximum pages to search per query (default 100)
+      --regex-file string       Path to a list of regexes. (default "rules.toml")
+      --results-only            Only print match strings.
+      --subdomain-file string   A file containing a list of subdomains (or other queries).
+      --threads int             Threads to dig with (default 20)
+```
 
+## Development
 ### Sending flags on VS Code
 
 On launch.json send the needed flags as args

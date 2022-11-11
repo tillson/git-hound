@@ -112,7 +112,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				continue
 			}
 			for page < pages {
-				options.Page = (page + 1)
 				str := ConstructSearchURL(base, query, options)
 				// fmt.Println(str)
 				response, err := client.Get(str)
@@ -140,48 +139,65 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					log.Fatal(err)
 				}
 				response.Body.Close()
+
+				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
+				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
+
 				if page == 0 {
-					regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
-					match := regex.FindStringSubmatch(responseStr)
-					if err != nil {
-						log.Fatal(err)
-					}
-					if match != nil && len(match) == 2 {
-						newPages, err := strconv.Atoi(match[1])
-						if err == nil {
-							if newPages > GetFlags().Pages {
-								newPages = GetFlags().Pages
+					if len(matches) == 0 {
+						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+						match := resultRegex.FindStringSubmatch(responseStr)
+						// fmt.Println(smatch)
+						var resultPayload NewSearchPayload
+						// fmt.Println(match[1])
+						json.Unmarshal([]byte(match[1]), &resultPayload)
+						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+							if pages != resultPayload.Payload.PageCount {
+								color.Cyan("[*] Searching " + strconv.Itoa(resultPayload.Payload.PageCount) + " pages of results for '" + query + "'...")
 							}
-							pages = newPages
-							if pages > 99 && GetFlags().ManyResults {
-								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-									color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
-								}
-								orders = append(orders, "desc")
-								rankings = append(orders, "")
-							} else {
-								if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-									color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
-								}
-							}
-						} else {
-							color.Red("[!] An error occurred while parsing the page count.")
-							fmt.Println(err)
+							pages = resultPayload.Payload.PageCount
 						}
 					} else {
-						if strings.Index(responseStr, "Sign in to GitHub") > -1 {
-							color.Red("[!] Unable to log into GitHub.")
-							log.Fatal()
+						regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
+						match := regex.FindStringSubmatch(responseStr)
+						if err != nil {
+							log.Fatal(err)
+						}
+						if len(match) == 2 {
+							newPages, err := strconv.Atoi(match[1])
+							if err == nil {
+								if newPages > GetFlags().Pages {
+									newPages = GetFlags().Pages
+								}
+								pages = newPages
+								if pages > 99 && GetFlags().ManyResults {
+									if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+										color.Cyan("[*] Searching 100+ pages of results for '" + query + "'...")
+									}
+									orders = append(orders, "desc")
+									rankings = append(orders, "")
+								} else {
+									if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+										color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+									}
+								}
+							} else {
+								color.Red("[!] An error occurred while parsing the page count.")
+								fmt.Println(err)
+							}
 						} else {
-							if !GetFlags().ResultsOnly {
-								color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+							if strings.Index(responseStr, "Sign in to GitHub") > -1 {
+								color.Red("[!] Unable to log into GitHub.")
+								log.Fatal()
+							} else if len(matches) > 0 {
+								if !GetFlags().ResultsOnly {
+									color.Cyan("[*] Searching 1 page of results for '" + query + "'...")
+								}
 							}
 						}
 					}
 				}
 				page++
-				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
-				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
 				if len(matches) == 0 {
 					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
 					match := resultRegex.FindStringSubmatch(responseStr)
@@ -189,12 +205,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					var resultPayload NewSearchPayload
 					// fmt.Println(match[1])
 					json.Unmarshal([]byte(match[1]), &resultPayload)
-					if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-						if pages != resultPayload.Payload.PageCount {
-							color.Cyan("[*] Searching " + strconv.Itoa(resultPayload.Payload.PageCount) + " pages of results for '" + query + "'...")
-						}
-						pages = resultPayload.Payload.PageCount
-					}
 					for _, result := range resultPayload.Payload.Results {
 						if resultSet[(result.RepoName+result.Path)] == true {
 							continue
@@ -228,7 +238,9 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					}
 					time.Sleep(time.Duration(delay) * time.Second)
 				}
+				options.Page = (page + 1)
 			}
+
 		}
 	}
 	return nil
