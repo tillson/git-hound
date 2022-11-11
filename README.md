@@ -1,20 +1,20 @@
 # GitHound
 
-A batch-catching, pattern-matching, patch-attacking secret snatcher.
+A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 ![GitHound](assets/logo.png)
 
-GitHound pinpoints exposed API keys and other sensitive information on GitHub using pattern matching, commit history searching, and a unique result scoring system. Unlike other secret-finding tools, GitHound takes advantage of GitHub's code search feature to search all of GitHub and isn't limited to specific repos, users, or orgs.
+GitHound hunts down exposed API keys and other sensitive information on GitHub using GitHub code search, pattern matching, commit history searching, and a unique result scoring system. Unlike other secret-finding tools, GitHound's use of of GitHub code search enables it to search all of GitHub and isn't limited to specific repos, users, or orgs.
 More information is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
 
-- GitHub/Gist code searching. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
+- GitHub/Gist code search. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
 - Sensitive data detection using pattern matching, contextual information, and string entropy
-- Commit history digging to find improperly deleted sensitive information (for repositories with <6 stars)
-- Scoring system to emphasize confident results, filter out common false positives, and to optimize intensive repo digging
+- Commit history digging to find improperly deleted sensitive information
+- Scoring system that filters common false positives and optimizes intensive repo digging
 - Base64 detection and decoding
-- Options to build GitHound into your workflow, including JSON output and custom regexes
+- Options to build GitHound into larger systems, including JSON output and custom regexes
 
 ## Usage
 
