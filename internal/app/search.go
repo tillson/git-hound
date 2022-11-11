@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -22,6 +23,19 @@ type RepoSearchResult struct {
 	Query         string
 	URL           string
 	searchOptions *SearchOptions
+}
+
+type NewSearchPayload struct {
+	Payload struct {
+		Results []struct {
+			FileName      string `json:"filename"`
+			RepoName      string `json:"repo_name"`
+			Path          string `json:"path"`
+			DefaultBranch string `json:"repo_default_branch"`
+			// Repository struct {
+			// }
+		} `json:"results"`
+	} `json:"payload"`
 }
 
 // Search Everything
@@ -167,6 +181,35 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				page++
 				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
 				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
+				if len(matches) == 0 {
+					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+					match := resultRegex.FindStringSubmatch(responseStr)
+					// fmt.Println(smatch)
+					var resultPayload NewSearchPayload
+					// fmt.Println(match[1])
+					json.Unmarshal([]byte(match[1]), &resultPayload)
+					for _, result := range resultPayload.Payload.Results {
+						if resultSet[(result.RepoName+result.Path)] == true {
+							continue
+						}
+						resultSet[(result.RepoName + result.Path)] = true
+						if GetFlags().PopulateWatchlist {
+							// fmt.Println(strings.Split(element[2], "/")[0])
+							_, err := db.Exec("INSERT OR IGNORE INTO tracked_users (username, last_event_id, affiliation) VALUES (?, ?, ?);", strings.Split(result.RepoName, "/")[0], 0, query)
+							if err != nil {
+								fmt.Println(err)
+							}
+						}
+						go ScanAndPrintResult(client, RepoSearchResult{
+							Repo:   result.RepoName,
+							File:   result.Path,
+							Raw:    "https://raw.githubusercontent.com/" + result.RepoName + "/" + result.DefaultBranch + "/" + result.Path,
+							Source: "repo",
+							Query:  query,
+							URL:    "https://github.com/" + result.RepoName + "/blob/" + result.DefaultBranch + "/" + result.Path,
+						})
+					}
+				} else {
 				for _, element := range matches {
 					if len(element) == 5 {
 						if resultSet[(element[2]+"/"+element[3])] == true {
@@ -176,7 +219,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 						go ScanAndPrintResult(client, RepoSearchResult{
 							Repo:   element[2],
 							File:   element[4],
-							Raw:    element[2] + "/master/" + element[4],
+								Raw:    "https://raw.githubusercontent.com/" + element[2] + "/" + element[3],
 							Source: "repo",
 							Query:  query,
 							URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
