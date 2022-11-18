@@ -58,6 +58,9 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	// fmt.Println(resp.StatusCode)
 	data, err := ioutil.ReadAll(resp.Body)
 	dataStr := string(data)
+	if strings.Index(dataStr, "Incorrect username or password.") > -1 {
+		return nil, fmt.Errorf("Incorrect username or password.") 
+	}
 	if strings.Index(dataStr, "name=\"otp\"") > -1 {
 		csrf, err = GrabCSRFTokenBody(dataStr)
 		if err != nil {
@@ -81,7 +84,6 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 			})
 			data, err = ioutil.ReadAll(resp.Body)
 		}
-		// fmt.Println(string(data))
 	}
 
 	return &client, err

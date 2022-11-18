@@ -142,7 +142,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 
 				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
 				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
-
 				if page == 0 {
 					if len(matches) == 0 {
 						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
@@ -150,6 +149,10 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 						// fmt.Println(smatch)
 						var resultPayload NewSearchPayload
 						// fmt.Println(match[1])
+						if len(match) == 0 {
+							page++
+							continue
+						}
 						json.Unmarshal([]byte(match[1]), &resultPayload)
 						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 							if pages != resultPayload.Payload.PageCount {
