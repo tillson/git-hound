@@ -106,6 +106,8 @@ var rootCmd = &cobra.Command{
 		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
 			color.Green("Finished.")
 		}
+
+		app.SearchWaitGroup.Wait()
 	},
 }
 
