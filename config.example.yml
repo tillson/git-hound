@@ -1,6 +1,6 @@
 # Required
-github_username: "tillson"
-github_password: "a8ueifjq4jkasdfoiulk"
+github_username: "username"
+github_password: "your_password"
 
 # Optional (comment out if not using)
 # github_totp_seed: "ABCDEF1234567890" # Obtained via https://github.com/settings/security

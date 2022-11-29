@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"sync"
 
 	"github.com/fatih/color"
 )
@@ -28,16 +29,17 @@ type RepoSearchResult struct {
 type NewSearchPayload struct {
 	Payload struct {
 		Results []struct {
-			FileName      string `json:"filename"`
-			RepoName      string `json:"repo_name"`
+			RepoName      string `json:"repo_nwo"`
 			Path          string `json:"path"`
-			DefaultBranch string `json:"repo_default_branch"`
+			CommitSha string `json:"commit_sha"`
 			// Repository struct {
 			// }
 		} `json:"results"`
 		PageCount int `json:"page_count"`
 	} `json:"payload"`
 }
+
+var SearchWaitGroup sync.WaitGroup
 
 // Search Everything
 func Search(query string, client *http.Client) (results []RepoSearchResult, err error) {
@@ -144,11 +146,10 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
 				if page == 0 {
 					if len(matches) == 0 {
-						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 						match := resultRegex.FindStringSubmatch(responseStr)
-						// fmt.Println(smatch)
 						var resultPayload NewSearchPayload
-						// fmt.Println(match[1])
+						
 						if len(match) == 0 {
 							page++
 							continue
@@ -202,24 +203,24 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				}
 				page++
 				if len(matches) == 0 {
-					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*)<\\/script>")
+					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 					match := resultRegex.FindStringSubmatch(responseStr)
-					// fmt.Println(smatch)
 					var resultPayload NewSearchPayload
-					// fmt.Println(match[1])
 					json.Unmarshal([]byte(match[1]), &resultPayload)
 					for _, result := range resultPayload.Payload.Results {
 						if resultSet[(result.RepoName+result.Path)] == true {
 							continue
 						}
 						resultSet[(result.RepoName + result.Path)] = true
+						SearchWaitGroup.Add(1)
+						// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
 						go ScanAndPrintResult(client, RepoSearchResult{
 							Repo:   result.RepoName,
 							File:   result.Path,
-							Raw:    "https://raw.githubusercontent.com/" + result.RepoName + "/" + result.DefaultBranch + "/" + result.Path,
+							Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
 							Source: "repo",
 							Query:  query,
-							URL:    "https://github.com/" + result.RepoName + "/blob/" + result.DefaultBranch + "/" + result.Path,
+							URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
 						})
 					}
 				} else {
@@ -229,10 +230,11 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 								continue
 							}
 							resultSet[(element[2] + "/" + element[3])] = true
+							SearchWaitGroup.Add(1)
 							go ScanAndPrintResult(client, RepoSearchResult{
 								Repo:   element[2],
 								File:   element[4],
-								Raw:    "https://raw.githubusercontent.com/" + element[2] + "/" + element[3],
+								Raw:    element[2] + "/" + element[3],
 								Source: "repo",
 								Query:  query,
 								URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
@@ -327,6 +329,7 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					continue
 				}
 				resultSet[element[1]] = true
+				SearchWaitGroup.Add(1)
 				go ScanAndPrintResult(client, RepoSearchResult{
 					Repo:   element[1],
 					File:   element[1],
