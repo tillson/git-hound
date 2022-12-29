@@ -206,22 +206,24 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 					match := resultRegex.FindStringSubmatch(responseStr)
 					var resultPayload NewSearchPayload
-					json.Unmarshal([]byte(match[1]), &resultPayload)
-					for _, result := range resultPayload.Payload.Results {
-						if resultSet[(result.RepoName+result.Path)] == true {
-							continue
-						}
-						resultSet[(result.RepoName + result.Path)] = true
-						SearchWaitGroup.Add(1)
-						// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
-						go ScanAndPrintResult(client, RepoSearchResult{
-							Repo:   result.RepoName,
-							File:   result.Path,
-							Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
-							Source: "repo",
-							Query:  query,
-							URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
-						})
+					if len(match) > 0 {
+						json.Unmarshal([]byte(match[1]), &resultPayload)
+						for _, result := range resultPayload.Payload.Results {
+							if resultSet[(result.RepoName+result.Path)] == true {
+								continue
+							}
+							resultSet[(result.RepoName + result.Path)] = true
+							SearchWaitGroup.Add(1)
+							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
+							go ScanAndPrintResult(client, RepoSearchResult{
+								Repo:   result.RepoName,
+								File:   result.Path,
+								Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
+								Source: "repo",
+								Query:  query,
+								URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
+							})
+						}	
 					}
 				} else {
 					for _, element := range matches {

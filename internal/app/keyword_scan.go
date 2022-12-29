@@ -55,7 +55,6 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		log.Fatal(err)
 	}
 	resultString := string(data)
-	// fmt.Println(1)
 	matches, score := GetMatchesForString(resultString, repo)
 	if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 		scannedRepos[repo.Repo] = true
