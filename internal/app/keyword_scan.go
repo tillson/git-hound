@@ -48,10 +48,11 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if scannedRepos[repo.Repo] {
 		return
 	}
+	defer SearchWaitGroup.Done()
 	var resultString string
 	if !GetFlags().FastMode {
 		base := GetRawURLForSearchResult(repo)
-		defer SearchWaitGroup.Done()
+		
 		data, err := DownloadRawFile(client, base, repo)
 		if err != nil {
 			log.Fatal(err)
