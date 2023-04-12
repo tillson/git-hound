@@ -16,6 +16,8 @@ type Flags struct {
 	NoFiles       bool
 	NoKeywords    bool
 	OnlyFiltered  bool
+	AllResults     bool
+	FastMode       bool
 	Threads       int
 	Debug         bool
 	LegacySearch  bool

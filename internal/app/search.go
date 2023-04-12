@@ -21,6 +21,7 @@ type RepoSearchResult struct {
 	File          string
 	Raw           string
 	Source        string
+	Contents        string
 	Query         string
 	URL           string
 	searchOptions *SearchOptions
@@ -95,8 +96,6 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 
 // SearchGitHub searches GitHub code results for the given query
 func SearchGitHub(query string, options SearchOptions, client *http.Client, results *[]RepoSearchResult, resultSet map[string]bool) (err error) {
-	// TODO: A lot of this code is shared between GitHub and Gist searches,
-	// so we should rework the logic
 	base := ""
 	if GetFlags().GithubRepo {
 		base = "https://github.com/" + query + "/search"
@@ -117,8 +116,11 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				str := ConstructSearchURL(base, query, options)
 				// fmt.Println(str)
 				response, err := client.Get(str)
+				// fmt.Println(response.StatusCode)
+				// fmt.Println(err)
 				if err != nil {
 					if response != nil {
+						// fmt.Println(response.StatusCode)
 						if response.StatusCode == 403 {
 							response.Body.Close()
 							delay += 5
@@ -137,6 +139,8 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				}
 				responseData, err := ioutil.ReadAll(response.Body)
 				responseStr := string(responseData)
+				// fmt.Println(responseStr)
+
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -214,15 +218,19 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							}
 							resultSet[(result.RepoName + result.Path)] = true
 							SearchWaitGroup.Add(1)
+							if !GetFlags().AllResults {
+								go ScanAndPrintResult(client, RepoSearchResult{
+									Repo:   result.RepoName,
+									File:   result.Path,
+									Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
+									Source: "repo",
+									Query:  query,
+									URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
+								})	
+							} else {
+
+							}
 							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
-							go ScanAndPrintResult(client, RepoSearchResult{
-								Repo:   result.RepoName,
-								File:   result.Path,
-								Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
-								Source: "repo",
-								Query:  query,
-								URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
-							})
 						}	
 					}
 				} else {

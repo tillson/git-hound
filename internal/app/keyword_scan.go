@@ -48,13 +48,31 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if scannedRepos[repo.Repo] {
 		return
 	}
-	base := GetRawURLForSearchResult(repo)
-	defer SearchWaitGroup.Done()
-	data, err := DownloadRawFile(client, base, repo)
-	if err != nil {
-		log.Fatal(err)
+	var resultString string
+	if !GetFlags().FastMode {
+		base := GetRawURLForSearchResult(repo)
+		defer SearchWaitGroup.Done()
+		data, err := DownloadRawFile(client, base, repo)
+		if err != nil {
+			log.Fatal(err)
+		}
+		repo.Contents = string(data)
 	}
-	resultString := string(data)
+	if GetFlags().AllResults {
+		if GetFlags().JsonOutput {
+			a, _ := json.Marshal(map[string]string{
+				"repo":    repo.Repo,
+				"file":	repo.File,
+				"content":  repo.Contents,
+			})
+			fmt.Println(string(a))
+		} else {
+			color.New(color.Faint).Println("[" + repo.Repo + "]")
+			color.New(color.Faint).Println("[" + repo.File + "]")
+			color.New(color.Faint).Println(repo.Contents)
+		}
+	} else {
+	// fmt.Println(resultString)
 	matches, score := GetMatchesForString(resultString, repo)
 	if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 		scannedRepos[repo.Repo] = true
@@ -96,6 +114,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			}
 		}
 	}
+	}
 }
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
@@ -117,10 +136,12 @@ func MatchKeywords(source string) (matches []Match) {
 			}
 		}
 	}
+	// fmt.Println(source)
 	// loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes.Rules {
 		regexp := regex.Regex.RegExp
 		matchStrings := regexp.FindAllString(source, -1)
+		// fmt.Println(matchStrings)
 		for _, match := range matchStrings {
 			shouldMatch := !regex.SmartFiltering
 			if regex.SmartFiltering {
