@@ -61,7 +61,7 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	if strings.Index(dataStr, "Incorrect username or password.") > -1 {
 		return nil, fmt.Errorf("Incorrect username or password.") 
 	}
-	if strings.Index(dataStr, "name=\"otp\"") > -1 {
+	if strings.Index(dataStr, "app_otp") > -1 {
 		csrf, err = GrabCSRFTokenBody(dataStr)
 		if err != nil {
 			return nil, err
