@@ -90,7 +90,6 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 			}
 		}
 	}
-
 	return results, err
 }
 
@@ -102,7 +101,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 	} else {
 		base = "https://github.com/search"
 	}
-
 	page, pages := 0, 1
 	var delay = 5
 	orders := []string{"asc"}
@@ -145,7 +143,6 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					log.Fatal(err)
 				}
 				response.Body.Close()
-
 				resultRegex := regexp.MustCompile("href=\"\\/((.*)\\/blob\\/([0-9a-f]{40}\\/([^#\"]+)))\">")
 				matches := resultRegex.FindAllStringSubmatch(responseStr, -1)
 				if page == 0 {
@@ -209,27 +206,26 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if len(matches) == 0 {
 					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 					match := resultRegex.FindStringSubmatch(responseStr)
+					// fmt.Println(match)
 					var resultPayload NewSearchPayload
 					if len(match) > 0 {
+						// fmt.Println(match[1])
 						json.Unmarshal([]byte(match[1]), &resultPayload)
+						// fmt.Println(resultPayload)
 						for _, result := range resultPayload.Payload.Results {
 							if resultSet[(result.RepoName+result.Path)] == true {
 								continue
 							}
 							resultSet[(result.RepoName + result.Path)] = true
 							SearchWaitGroup.Add(1)
-							if !GetFlags().AllResults {
-								go ScanAndPrintResult(client, RepoSearchResult{
-									Repo:   result.RepoName,
-									File:   result.Path,
-									Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
-									Source: "repo",
-									Query:  query,
-									URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
-								})	
-							} else {
-
-							}
+							go ScanAndPrintResult(client, RepoSearchResult{
+								Repo:   result.RepoName,
+								File:   result.Path,
+								Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
+								Source: "repo",
+								Query:  query,
+								URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
+							})	
 							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
 						}	
 					}
