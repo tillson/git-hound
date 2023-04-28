@@ -30,7 +30,8 @@ type RepoSearchResult struct {
 type NewSearchPayload struct {
 	Payload struct {
 		Results []struct {
-			RepoName      string `json:"repo_nwo"`
+			RepoNwo      string `json:"repo_nwo"`
+			RepoName      string `json:"repo_name"`
 			Path          string `json:"path"`
 			CommitSha string `json:"commit_sha"`
 			// Repository struct {
@@ -160,8 +161,8 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							if pages != resultPayload.Payload.PageCount {
 								color.Cyan("[*] Searching " + strconv.Itoa(resultPayload.Payload.PageCount) + " pages of results for '" + query + "'...")
 							}
-							pages = resultPayload.Payload.PageCount
 						}
+						pages = resultPayload.Payload.PageCount
 					} else {
 						regex := regexp.MustCompile("\\bdata\\-total\\-pages\\=\"(\\d+)\"")
 						match := regex.FindStringSubmatch(responseStr)
@@ -206,16 +207,18 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				if len(matches) == 0 {
 					resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 					match := resultRegex.FindStringSubmatch(responseStr)
-					// fmt.Println(match)
 					var resultPayload NewSearchPayload
 					if len(match) > 0 {
+						// fmt.Println(match[1]/)
 						// fmt.Println(match[1])
 						json.Unmarshal([]byte(match[1]), &resultPayload)
-						// fmt.Println(resultPayload)
 						for _, result := range resultPayload.Payload.Results {
 							if resultSet[(result.RepoName+result.Path)] == true {
 								continue
 							}
+							if result.RepoName == "" {
+								result.RepoName = result.RepoNwo
+							}	
 							resultSet[(result.RepoName + result.Path)] = true
 							SearchWaitGroup.Add(1)
 							go ScanAndPrintResult(client, RepoSearchResult{
@@ -229,26 +232,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
 						}	
 					}
-				} else {
-					for _, element := range matches {
-						if len(element) == 5 {
-							if resultSet[(element[2]+"/"+element[3])] == true {
-								continue
-							}
-							resultSet[(element[2] + "/" + element[3])] = true
-							SearchWaitGroup.Add(1)
-							go ScanAndPrintResult(client, RepoSearchResult{
-								Repo:   element[2],
-								File:   element[4],
-								Raw:    element[2] + "/" + element[3],
-								Source: "repo",
-								Query:  query,
-								URL:    "https://github.com/" + element[2] + "/blob/" + element[3],
-							})
-						}
-					}
-					time.Sleep(time.Duration(delay) * time.Second)
-				}
+				} 
 				options.Page = (page + 1)
 			}
 
