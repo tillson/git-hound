@@ -4,7 +4,7 @@ A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 ![GitHound](assets/logo.png)
 
-GitHound hunts down exposed API keys and other sensitive information on GitHub using GitHub code search, pattern matching, commit history searching, and a unique result scoring system. Unlike other secret-finding tools, GitHound's use of of GitHub code search enables it to search all of GitHub and isn't limited to specific repos, users, or orgs.
+GitHound hunts down exposed API keys and other sensitive information on GitHub using GitHub code search, pattern matching, and commit history searching. Unlike other secret-finding tools, GitHound's use of of GitHub code search enables it to search all of GitHub and isn't limited to specific repos, users, or orgs.
 More information is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
