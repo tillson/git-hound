@@ -49,7 +49,6 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		return
 	}
 	defer SearchWaitGroup.Done()
-	var resultString string
 	if !GetFlags().FastMode {
 		base := GetRawURLForSearchResult(repo)
 		
