@@ -304,7 +304,7 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 					color.Red("[!] Unable to log into GitHub.")
 					log.Fatal()
 				} else {
-					if !GetFlags().ResultsOnly {
+					if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 						color.Cyan("[*] Searching 1 page of Gist results for '" + query + "'...")
 					}
 				}
