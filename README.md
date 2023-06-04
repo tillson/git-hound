@@ -113,7 +113,7 @@ These are discussions about how people use GitHound in their workflows and how w
 [List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
 
 ## 💰 Premium Monitoring & Engagements
-Would you like to gain greater visibility into your company's GitHub presence? We use GitHound as one small part of a larger system that can find credential leaks, and sensitive/proprietary information across open-source websites like GitHub and DockerHub. We offer continuous monitoring services of *all of GitHub* (not just accounts you know are held by employees!) and red-team engagements/consulting services.
+Would you like to gain greater visibility into your company's GitHub presence? We use GitHound as one small part of a larger system that can find credential leaks and sensitive/proprietary information across open-source websites like GitHub and DockerHub. We offer continuous monitoring services of *all of GitHub* (not just accounts you know are held by employees!) and red-team engagements/consulting services.
 
 Reach out here to learn more: https://secretsurfer.xyz.
 
