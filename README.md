@@ -112,9 +112,8 @@ From the main folder: `go build .`
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
 [List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
 
-## Sponsoring
-
-If GitHound helped you earn a big bounty, consider sending me a tip with GitHub Sponsors.
+## 💰 Premium Monitoring & Engagements
+Are you interested in obtaining a clearer image of your company's GitHub presence? We have an enterprise product that can help. We use GitHound as one small part of a larger system that can find credential leaks, and sensitive/proprietary information across open-source websites like GitHub and DockerHub. Reach out here to learn more: https://secretsurfer.xyz. We offer continuous monitoring services of *all of GitHub* (not just accounts you know are held by employees!) and red-team engagements/consulting services to protect your business from leaks.
 
 ## References
 
