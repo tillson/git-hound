@@ -1,3 +1,6 @@
+# Instructions: rename this file to config.yml. 
+# DO NOT CHECK YOUR USERNAME AND PASSWORD INTO GIT!
+
 # Required
 github_username: "username"
 github_password: "your_password"
