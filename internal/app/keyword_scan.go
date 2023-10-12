@@ -75,9 +75,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	matches, score := GetMatchesForString(repo.Contents, repo)
 	if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 		scannedRepos[repo.Repo] = true
-		for _, match := range Dig(repo) {
-			matches = append(matches, match)
-		}
+		matches = append(matches, Dig(repo)...)
 	}
 
 	if len(matches) > 0 {
@@ -130,9 +128,7 @@ func MatchKeywords(source string) (matches []Match) {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
 			decodedMatches := MatchKeywords(string(decoded))
 
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
+			matches = append(matches, decodedMatches...)
 		}
 	}
 	// fmt.Println(source)
@@ -176,9 +172,7 @@ func MatchAPIKeys(source string) (matches []Match) {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
 			decodedMatches := MatchAPIKeys(string(decoded))
 
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
+			matches = append(matches, decodedMatches...)
 		}
 	}
 	return matches
@@ -197,9 +191,7 @@ func MatchCustomRegex(source string) (matches []Match) {
 			decoded, _ := b64.StdEncoding.DecodeString(match)
 			decodedMatches := MatchCustomRegex(string(decoded))
 
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
+			matches = append(matches, decodedMatches...)
 		}
 	}
 	for _, regex := range customRegexes {

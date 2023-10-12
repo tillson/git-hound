@@ -59,9 +59,7 @@ var rootCmd = &cobra.Command{
 		var queries []string
 
 		if cmd.Flag("subdomain-file").Value.String() != "" {
-			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
-				queries = append(queries, query)
-			}
+			queries = append(queries, app.GetFileLines(app.GetFlags().SubdomainFile)...)
 		} else {
 			if !terminal.IsTerminal(0) {
 				scanner := getScanner(args)

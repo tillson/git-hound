@@ -259,9 +259,7 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		}
 		matches, _ = GetMatchesForString(patchStr, result)
 		for _, diffFile := range diffData.Files {
-			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
-				matches = append(matches, match)
-			}
+			matches = append(matches, MatchFileExtensions(diffFile.NewName, result)...)
 		}
 	}
 	return matches
