@@ -107,6 +107,55 @@ On launch.json send the needed flags as args
 
 From the main folder: `go build .`
 
+Sure, I can help you create a README file for your Docker container setup. This README will provide instructions on how to build and run the Docker container for `git-hound`, including the necessary steps to mount `config.yaml` and input files.
+
+---
+
+## Building the Docker Image
+To build the Docker image for Git-Hound, use the following command:
+
+```bash
+docker build -t my-githound-container .
+```
+
+This command builds the Docker image with the tag `my-githound-container`. You can change the tag name to your preference.
+
+#### Running the Container
+To run the Git-Hound Docker container, you'll need to provide your `config.yaml` file and any input files (like `subdomains.txt`) via Docker volumes.
+
+#### Mounting `config.yaml`
+Place your `config.yaml` file at a known location on your host machine. This file should contain your Git-Hound configuration, including GitHub credentials.
+
+Example `config.yaml`:
+
+```yaml
+# config.yaml
+github_username: "your_username"
+github_password: "your_password"
+# Optional: GitHub TOTP seed
+# github_totp_seed: "ABCDEF1234567890"
+```
+
+#### Mounting Input Files
+If you have a file like `subdomains.txt`, place it in a directory on your host machine.
+
+#### Running the Command
+Use the following command to run the container with your configuration and input files:
+
+```bash
+docker run -v /path/to/config.yaml:/root/.githound/config.yaml -v $(pwd)/data:/data my-githound-container --subdomain-file /data/subdomains.txt
+```
+
+Replace `/path/to/config.yaml` with the actual path to your `config.yaml` file. The `-v $(pwd)/data:/data` part mounts a directory containing your input files (`subdomains.txt`) into the container.
+
+#### Notes
+- Ensure your `config.yaml` and input files' paths are correct when running the Docker container.
+- This setup assumes `git-hound` is compatible with the provided configuration and command-line arguments.
+- For any updates or changes to `git-hound`, rebuild the Docker image.
+
+---
+
+
 ## User feedback
 
 These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
