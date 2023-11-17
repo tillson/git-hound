@@ -107,8 +107,6 @@ On launch.json send the needed flags as args
 
 From the main folder: `go build .`
 
-Sure, I can help you create a README file for your Docker container setup. This README will provide instructions on how to build and run the Docker container for `git-hound`, including the necessary steps to mount `config.yaml` and input files.
-
 ---
 
 ## Building the Docker Image
