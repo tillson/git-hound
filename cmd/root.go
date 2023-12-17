@@ -18,7 +18,8 @@ import (
 
 // InitializeFlags initializes GitHound's command line flags.
 func InitializeFlags() {
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SubdomainFile, "subdomain-file", "", "A file containing a list of subdomains (or other queries).")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().QueryFile, "query-file", "", "A file containing a list of subdomains (or other queries).")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query stiing (default: stdin)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules.toml", "Path to a list of regexes.")
@@ -58,25 +59,29 @@ var rootCmd = &cobra.Command{
 
 		var queries []string
 
-		if cmd.Flag("subdomain-file").Value.String() != "" {
-			for _, query := range app.GetFileLines(app.GetFlags().SubdomainFile) {
+		if cmd.Flag("query").Value.String() != "" {
+			queries = append(queries, cmd.Flag("query").Value.String())
+		}
+		if cmd.Flag("query-file").Value.String() != "" {
+			for _, query := range app.GetFileLines(app.GetFlags().QueryFile) {
 				queries = append(queries, query)
 			}
-		} else {
-			if !terminal.IsTerminal(0) {
-				scanner := getScanner(args)
-				for scanner.Scan() {
-					bytes := scanner.Bytes()
-					str := string(bytes)
-					if str != "" {
-						queries = append(queries, str)
-					}
+
+		}
+		if !terminal.IsTerminal(0) {
+			scanner := getScanner(args)
+			for scanner.Scan() {
+				bytes := scanner.Bytes()
+				str := string(bytes)
+				if str != "" {
+					queries = append(queries, str)
 				}
-			} else {
-				color.Red("[!] No search queries specified.")
-				os.Exit(1)
-				return
 			}
+		}
+		if len(queries) == 0 {
+			color.Red("[!] No search queries specified.")
+			os.Exit(1)
+			return
 		}
 
 		client, err := app.LoginToGitHub(app.GitHubCredentials{
@@ -84,7 +89,7 @@ var rootCmd = &cobra.Command{
 			Password: viper.GetString("github_password"),
 			OTP:      viper.GetString("github_totp_seed"),
 		})
-		// if client.
+
 		if err != nil {
 			fmt.Println(err)
 			color.Red("[!] Unable to login to GitHub.")
