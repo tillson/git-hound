@@ -51,7 +51,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	defer SearchWaitGroup.Done()
 	if !GetFlags().FastMode {
 		base := GetRawURLForSearchResult(repo)
-		
+
 		data, err := DownloadRawFile(client, base, repo)
 		if err != nil {
 			log.Fatal(err)
@@ -62,8 +62,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		if GetFlags().JsonOutput {
 			a, _ := json.Marshal(map[string]string{
 				"repo":    repo.Repo,
-				"file":	repo.File,
-				"content":  repo.Contents,
+				"file":    repo.File,
+				"content": repo.Contents,
 			})
 			fmt.Println(string(a))
 		} else {
@@ -72,47 +72,47 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			color.New(color.Faint).Println(repo.Contents)
 		}
 	} else {
-	matches, score := GetMatchesForString(repo.Contents, repo)
-	if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
-		scannedRepos[repo.Repo] = true
-		for _, match := range Dig(repo) {
-			matches = append(matches, match)
+		matches, score := GetMatchesForString(repo.Contents, repo)
+		if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
+			scannedRepos[repo.Repo] = true
+			for _, match := range Dig(repo) {
+				matches = append(matches, match)
+			}
 		}
-	}
 
-	if len(matches) > 0 {
-		resultRepoURL := GetRepoURLForSearchResult(repo)
-		if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-			color.Green("[" + resultRepoURL + "]")
-		}
-		for _, result := range matches {
-			if result.KeywordType == "apiKey" {
-				if apiKeyMap[result.Text] == true {
-					continue
-				}
-				apiKeyMap[result.Text] = true
+		if len(matches) > 0 {
+			resultRepoURL := GetRepoURLForSearchResult(repo)
+			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+				color.Green("[" + resultRepoURL + "]")
 			}
-			if GetFlags().ResultsOnly {
-				fmt.Println(result.Text)
-			} else {
-				if GetFlags().JsonOutput {
-					a, _ := json.Marshal(map[string]string{
-						"repo":    resultRepoURL,
-						"context": result.Line.Text,
-						"match":   result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
-						"type":    result.KeywordType,
-						"url":     GetResultLink(repo, result),
-					})
-					fmt.Println(string(a))
+			for _, result := range matches {
+				if result.KeywordType == "apiKey" {
+					if apiKeyMap[result.Text] == true {
+						continue
+					}
+					apiKeyMap[result.Text] = true
+				}
+				if GetFlags().ResultsOnly {
+					fmt.Println(result.Text)
 				} else {
-					PrintContextLine(result.Line)
-					PrintPatternLine(result)
-					PrintKeywordType(result)
-					color.New(color.Faint).Println(GetResultLink(repo, result))
+					if GetFlags().JsonOutput {
+						a, _ := json.Marshal(map[string]string{
+							"repo":    resultRepoURL,
+							"context": result.Line.Text,
+							"match":   result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
+							"type":    result.KeywordType,
+							"url":     GetResultLink(repo, result),
+						})
+						fmt.Println(string(a))
+					} else {
+						PrintContextLine(result.Line)
+						PrintPatternLine(result)
+						PrintKeywordType(result)
+						color.New(color.Faint).Println(GetResultLink(repo, result))
+					}
 				}
 			}
 		}
-	}
 	}
 }
 
@@ -381,10 +381,16 @@ func containsCommonWord(str string) bool {
 	if r == nil {
 		r = regexp.MustCompile("(?i)(" + strings.Join(getProgrammingWords(), "|") + ")")
 	}
-	if r.FindString(str) != "" {
-		return true
+	matches := r.FindAllString(str, -1)
+	sumOfLengths := 0
+	for _, match := range matches {
+		sumOfLengths += len(match)
 	}
-	return false
+
+	if float64(sumOfLengths)/float64(len(str)) > 0.5 {
+		return false
+	}
+	return true
 }
 
 func containsSequence(str string) bool {
