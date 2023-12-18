@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/base64"
 	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 )
@@ -21,13 +23,13 @@ type ResultScan struct {
 
 // Match represents a keyword/API key match
 type Match struct {
-	Text        string
-	KeywordType string
-	Line        Line
-	Commit      string
-	CommitFile  string
-	File        string
-	Expression  string
+	Text       string
+	Attributes []string
+	Line       Line
+	Commit     string
+	CommitFile string
+	File       string
+	Expression string
 }
 
 // Line represents a text line, the context for a Match.
@@ -86,7 +88,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				color.Green("[" + resultRepoURL + "]")
 			}
 			for _, result := range matches {
-				if result.KeywordType == "apiKey" {
+				if slice_contains(result.Attributes, "api_key") {
 					if apiKeyMap[result.Text] == true {
 						continue
 					}
@@ -96,18 +98,18 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 					fmt.Println(result.Text)
 				} else {
 					if GetFlags().JsonOutput {
-						a, _ := json.Marshal(map[string]string{
-							"repo":    resultRepoURL,
-							"context": result.Line.Text,
-							"match":   result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
-							"type":    result.KeywordType,
-							"url":     GetResultLink(repo, result),
+						a, _ := json.Marshal(map[string]interface{}{
+							"repo":       resultRepoURL,
+							"context":    result.Line.Text,
+							"match":      result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
+							"attributes": result.Attributes,
+							"url":        GetResultLink(repo, result),
 						})
 						fmt.Println(string(a))
 					} else {
 						PrintContextLine(result.Line)
 						PrintPatternLine(result)
-						PrintKeywordType(result)
+						PrintAttributes(result)
 						color.New(color.Faint).Println(GetResultLink(repo, result))
 					}
 				}
@@ -124,6 +126,7 @@ func MatchKeywords(source string) (matches []Match) {
 	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
 	regex := regexp.MustCompile(base64Regex)
 
+	// Match Keywords on decoded base64 strings
 	base64Strings := regex.FindAllString(source, -1)
 	if base64Strings != nil {
 		for _, match := range base64Strings {
@@ -135,8 +138,8 @@ func MatchKeywords(source string) (matches []Match) {
 			}
 		}
 	}
-	// fmt.Println(source)
-	// loop over regexes from database
+
+	// Loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes.Rules {
 		regexp := regex.Regex.RegExp
 		matchStrings := regexp.FindAllString(source, -1)
@@ -150,10 +153,10 @@ func MatchKeywords(source string) (matches []Match) {
 			}
 			if shouldMatch {
 				matches = append(matches, Match{
-					KeywordType: regex.Name,
-					Text:        string(match),
-					Expression:  regexp.String(),
-					Line:        GetLine(source, match),
+					Attributes: []string{regex.Name},
+					Text:       string(match),
+					Expression: regexp.String(),
+					Line:       GetLine(source, match),
 				})
 			}
 		}
@@ -189,27 +192,30 @@ func MatchCustomRegex(source string) (matches []Match) {
 	if source == "" {
 		return matches
 	}
+
 	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
 	regex := regexp.MustCompile(base64Regex)
-	base64Strings := regex.FindAllString(source, -1)
-	if base64Strings != nil {
-		for _, match := range base64Strings {
-			decoded, _ := b64.StdEncoding.DecodeString(match)
-			decodedMatches := MatchCustomRegex(string(decoded))
 
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
+	base64Strings := regex.FindAllStringIndex(source, -1)
+	for _, indices := range base64Strings {
+		match := source[indices[0]:indices[1]]
+		decodedBytes, err := base64.StdEncoding.DecodeString(match)
+		if err == nil && utf8.Valid(decodedBytes) {
+			decodedStr := string(decodedBytes)
+			source = source[:indices[0]] + decodedStr + source[indices[1]:]
+			decodedMatches := MatchKeywords(source)
+			matches = append(matches, decodedMatches...)
 		}
 	}
+
 	for _, regex := range customRegexes {
 		regMatches := regex.FindAllString(source, -1)
 		for _, regMatch := range regMatches {
 			matches = append(matches, Match{
-				KeywordType: "custom",
-				Text:        regMatch,
-				Expression:  regex.String(),
-				Line:        GetLine(source, regMatch),
+				Attributes: []string{"regex"},
+				Text:       regMatch,
+				Expression: regex.String(),
+				Line:       GetLine(source, regMatch),
 			})
 		}
 
@@ -229,10 +235,10 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 	for _, match := range matchStrings {
 		if len(match) > 0 {
 			matches = append(matches, Match{
-				KeywordType: "fileExtension",
-				Text:        string(match[0]),
-				Expression:  regex.String(),
-				Line:        GetLine(source, match[0]),
+				Attributes: []string{"interesting_filename"},
+				Text:       string(match[0]),
+				Expression: regex.String(),
+				Line:       GetLine(source, match[0]),
 			})
 		}
 	}
@@ -266,8 +272,8 @@ func PrintPatternLine(match Match) {
 	fmt.Printf("RegEx Pattern: %s\n", match.Expression)
 }
 
-func PrintKeywordType(match Match) {
-	fmt.Printf("Keyword Type: %s\n", match.KeywordType)
+func PrintAttributes(match Match) {
+	fmt.Printf("Attributes: %v\n", match.Attributes)
 }
 
 // Entropy calculates the Shannon entropy of a string
