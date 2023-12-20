@@ -46,19 +46,23 @@ var loadedRegexes = false
 
 // ScanAndPrintResult scans and prints information about a search result.
 func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
+	// fmt.Println(repo)
+	// SearchWaitGroup.Wait()
 	if scannedRepos[repo.Repo] {
 		return
 	}
-
-	defer SearchWaitGroup.Done()
+	// defer SearchWaitGroup.Done()
 	if !GetFlags().FastMode {
 		base := GetRawURLForSearchResult(repo)
-
 		data, err := DownloadRawFile(client, base, repo)
 		if err != nil {
 			log.Fatal(err)
 		}
 		repo.Contents = string(data)
+	}
+	// debug message. size of data, repo, and path
+	if GetFlags().Debug {
+		fmt.Println("downloaded", len(repo.Contents), repo.Repo, repo.File)
 	}
 	if GetFlags().AllResults {
 		if GetFlags().JsonOutput {
@@ -74,7 +78,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			color.New(color.Faint).Println(repo.Contents)
 		}
 	} else {
-		matches, score := GetMatchesForString(repo.Contents, repo)
+		matches, score := GetMatchesForString(repo.Contents, repo, true)
 		if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 			scannedRepos[repo.Repo] = true
 			for _, match := range Dig(repo) {
@@ -116,6 +120,11 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			}
 		}
 	}
+	if GetFlags().Debug {
+		fmt.Println("Finished scanning " + repo.Repo + "...")
+	}
+
+	SearchWaitGroup.Done()
 }
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
@@ -255,23 +264,26 @@ func GetResultLink(result RepoSearchResult, match Match) string {
 
 // GetMatchesForString runs pattern matching and scoring checks on the given string
 // and returns the matches.
-func GetMatchesForString(source string, result RepoSearchResult) (matches []Match, score int) {
+func GetMatchesForString(source string, result RepoSearchResult, recursion bool) (matches []Match, score int) {
 
 	// Undecode any base64 and run again
 	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
 	regex := regexp.MustCompile(base64Regex)
 
 	base64_score := 0
-	base64Strings := regex.FindAllStringIndex(source, -1)
-	for _, indices := range base64Strings {
-		match := source[indices[0]:indices[1]]
-		decodedBytes, err := base64.StdEncoding.DecodeString(match)
-		if err == nil && utf8.Valid(decodedBytes) {
-			decodedStr := string(decodedBytes)
-			new_source := source[:indices[0]] + decodedStr + source[indices[1]:]
-			decodedMatches, new_score := GetMatchesForString(new_source, result)
-			base64_score = new_score
-			matches = append(matches, decodedMatches...)
+	var base64Strings [][]int
+	if recursion {
+		base64Strings = regex.FindAllStringIndex(source, -1)
+		for _, indices := range base64Strings {
+			match := source[indices[0]:indices[1]]
+			decodedBytes, err := base64.StdEncoding.DecodeString(match)
+			if err == nil && utf8.Valid(decodedBytes) {
+				decodedStr := string(decodedBytes)
+				new_source := source[:indices[0]] + decodedStr + source[indices[1]:]
+				decodedMatches, new_score := GetMatchesForString(new_source, result, false)
+				base64_score = new_score
+				matches = append(matches, decodedMatches...)
+			}
 		}
 	}
 

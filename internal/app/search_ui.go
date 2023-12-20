@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/spf13/viper"
 )
 
 // RepoSearchResult represents a result in GitHub/Gist code search.
@@ -42,6 +44,43 @@ type NewSearchPayload struct {
 }
 
 var SearchWaitGroup sync.WaitGroup
+
+func SearchWithUI(queries []string) {
+	client, err := LoginToGitHub(GitHubCredentials{
+		Username: viper.GetString("github_username"),
+		Password: viper.GetString("github_password"),
+		OTP:      viper.GetString("github_totp_seed"),
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		color.Red("[!] Unable to login to GitHub. Please check your username/password credentials.")
+		os.Exit(1)
+	}
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
+	}
+	for _, query := range queries {
+		_, err = Search(query, client)
+		if err != nil {
+			color.Red("[!] Unable to collect search results for query '" + query + "'.")
+			break
+		}
+	}
+	// size, err := app.DirSize("/tmp/githound")
+	// if err == nil && size > 50e+6 {
+	// 	app.ClearRepoStorage()
+	// }
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Green("Finished searching... Now waiting for scanning to finish.")
+	}
+
+	SearchWaitGroup.Wait()
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Green("Finished scanning.")
+	}
+
+}
 
 // Search Everything
 func Search(query string, client *http.Client) (results []RepoSearchResult, err error) {

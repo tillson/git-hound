@@ -132,7 +132,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						if float32(len(ascii))/float32(len(data)) < 0.9 {
 							// fmt.Println("skipping: " + file)
 						} else {
-							searchMatches, searchScore := GetMatchesForString(string(ascii), result)
+							searchMatches, searchScore := GetMatchesForString(string(ascii), result, true)
 							score += searchScore
 							// fmt.Println(searchMatches)
 							if searchScore > 1 {
@@ -257,7 +257,7 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if err != nil {
 			log.Fatal(err)
 		}
-		matches, _ = GetMatchesForString(patchStr, result)
+		matches, _ = GetMatchesForString(patchStr, result, true)
 		for _, diffFile := range diffData.Files {
 			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
 				matches = append(matches, match)

@@ -85,6 +85,8 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
+		toml.DecodeFile(app.GetFlags().RegexFile, &app.GetFlags().TextRegexes)
+
 		if app.GetFlags().SearchType == "ui" && viper.GetString("github_username") == "" {
 			color.Red("[!] GitHound run in UI mode but github_username not specified in config.yml. Update config.yml or run in API mode (flag: `--search-type api`)")
 			os.Exit(1)
@@ -92,37 +94,13 @@ var rootCmd = &cobra.Command{
 			color.Red("[!] GitHound run in API mode but github_access_token not specified in config.yml. Update config.yml or run in UI mode (flag: `--search-type ui`)")
 			os.Exit(1)
 		}
-		client, err := app.LoginToGitHub(app.GitHubCredentials{
-			Username: viper.GetString("github_username"),
-			Password: viper.GetString("github_password"),
-			OTP:      viper.GetString("github_totp_seed"),
-		})
 
-		if err != nil {
-			fmt.Println(err)
-			color.Red("[!] Unable to login to GitHub. Please check your username/password credentials.")
-			os.Exit(1)
-		}
-		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
-			color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
-		}
-		toml.DecodeFile(app.GetFlags().RegexFile, &app.GetFlags().TextRegexes)
-		for _, query := range queries {
-			_, err = app.Search(query, client)
-			if err != nil {
-				color.Red("[!] Unable to collect search results for query '" + query + "'.")
-				break
-			}
-		}
-		size, err = app.DirSize("/tmp/githound")
-		if err == nil && size > 50e+6 {
-			app.ClearRepoStorage()
-		}
-		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
-			color.Green("Finished.")
+		if app.GetFlags().SearchType == "ui" {
+			app.SearchWithUI(queries)
+		} else {
+			app.SearchWithAPI(queries)
 		}
 
-		app.SearchWaitGroup.Wait()
 	},
 }
 
