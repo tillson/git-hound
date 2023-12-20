@@ -18,6 +18,7 @@ import (
 
 // InitializeFlags initializes GitHound's command line flags.
 func InitializeFlags() {
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SearchType, "search-type", "", "Search interface (`api` or `ui`).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().QueryFile, "query-file", "", "A file containing a list of subdomains (or other queries).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query stiing (default: stdin)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
@@ -79,11 +80,18 @@ var rootCmd = &cobra.Command{
 			}
 		}
 		if len(queries) == 0 {
-			color.Red("[!] No search queries specified.")
+			color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
 			os.Exit(1)
 			return
 		}
 
+		if app.GetFlags().SearchType == "ui" && viper.GetString("github_username") == "" {
+			color.Red("[!] GitHound run in UI mode but github_username not specified in config.yml. Update config.yml or run in API mode (flag: `--search-type api`)")
+			os.Exit(1)
+		} else if app.GetFlags().SearchType == "api" && viper.GetString("github_access_token") == "" {
+			color.Red("[!] GitHound run in API mode but github_access_token not specified in config.yml. Update config.yml or run in UI mode (flag: `--search-type ui`)")
+			os.Exit(1)
+		}
 		client, err := app.LoginToGitHub(app.GitHubCredentials{
 			Username: viper.GetString("github_username"),
 			Password: viper.GetString("github_password"),
@@ -92,7 +100,7 @@ var rootCmd = &cobra.Command{
 
 		if err != nil {
 			fmt.Println(err)
-			color.Red("[!] Unable to login to GitHub.")
+			color.Red("[!] Unable to login to GitHub. Please check your username/password credentials.")
 			os.Exit(1)
 		}
 		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
@@ -147,10 +155,10 @@ func ReadConfig() {
 	err := viper.ReadInConfig()
 	if err != nil {
 		if app.GetFlags().ConfigFile != "" {
-			color.Red("[!] '" + app.GetFlags().ConfigFile + "' was not found.")
+			color.Red("[!] '" + app.GetFlags().ConfigFile + "' was not found. Please check the file path and try again.")
 
 		} else {
-			color.Red("[!] config.yml was not found.")
+			color.Red("[!] config.yml was not found. Please ensure config.yml exists in current working directory or $HOME/.githound/, or use flag `--config [config_path]`.")
 		}
 		os.Exit(1)
 		return

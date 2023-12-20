@@ -26,6 +26,7 @@ type Flags struct {
 	NoRepos      bool
 	ManyResults  bool
 	JsonOutput   bool
+	SearchType   string
 	OTPCode      string
 	TextRegexes  config
 }
