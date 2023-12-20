@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/base64"
-	b64 "encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -50,6 +49,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 	if scannedRepos[repo.Repo] {
 		return
 	}
+
 	defer SearchWaitGroup.Done()
 	if !GetFlags().FastMode {
 		base := GetRawURLForSearchResult(repo)
@@ -123,21 +123,6 @@ func MatchKeywords(source string) (matches []Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
-	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
-	regex := regexp.MustCompile(base64Regex)
-
-	// Match Keywords on decoded base64 strings
-	base64Strings := regex.FindAllString(source, -1)
-	if base64Strings != nil {
-		for _, match := range base64Strings {
-			decoded, _ := b64.StdEncoding.DecodeString(match)
-			decodedMatches := MatchKeywords(string(decoded))
-
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
-		}
-	}
 
 	// Loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes.Rules {
@@ -165,47 +150,10 @@ func MatchKeywords(source string) (matches []Match) {
 	return matches
 }
 
-// MatchAPIKeys takes a string and checks if it contains API keys using pattern matching and entropy checking.
-func MatchAPIKeys(source string) (matches []Match) {
-	if GetFlags().NoAPIKeys || source == "" {
-		return matches
-	}
-
-	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
-	regex := regexp.MustCompile(base64Regex)
-	base64Strings := regex.FindAllString(source, -1)
-	if base64Strings != nil {
-		for _, match := range base64Strings {
-			decoded, _ := b64.StdEncoding.DecodeString(match)
-			decodedMatches := MatchAPIKeys(string(decoded))
-
-			for _, decodedMatch := range decodedMatches {
-				matches = append(matches, decodedMatch)
-			}
-		}
-	}
-	return matches
-}
-
 // MatchCustomRegex matches a string against a slice of regexes.
 func MatchCustomRegex(source string) (matches []Match) {
 	if source == "" {
 		return matches
-	}
-
-	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
-	regex := regexp.MustCompile(base64Regex)
-
-	base64Strings := regex.FindAllStringIndex(source, -1)
-	for _, indices := range base64Strings {
-		match := source[indices[0]:indices[1]]
-		decodedBytes, err := base64.StdEncoding.DecodeString(match)
-		if err == nil && utf8.Valid(decodedBytes) {
-			decodedStr := string(decodedBytes)
-			source = source[:indices[0]] + decodedStr + source[indices[1]:]
-			decodedMatches := MatchKeywords(source)
-			matches = append(matches, decodedMatches...)
-		}
 	}
 
 	for _, regex := range customRegexes {
@@ -305,30 +253,30 @@ func GetResultLink(result RepoSearchResult, match Match) string {
 	}
 }
 
-func initializeCustomRegexes() {
-	loadedRegexes = true
-	regexStrings := GetFileLines(GetFlags().RegexFile)
-	for _, regexString := range regexStrings {
-		regex, err := regexp.Compile(regexString)
-		if err != nil {
-			color.Red("[!] Invalid regex: `" + regexString + " ` .")
-			break
-		}
-		customRegexes = append(customRegexes, regex)
-	}
-}
-
 // GetMatchesForString runs pattern matching and scoring checks on the given string
 // and returns the matches.
 func GetMatchesForString(source string, result RepoSearchResult) (matches []Match, score int) {
-	if !GetFlags().NoKeywords {
-		for _, match := range MatchKeywords(source) {
-			matches = append(matches, match)
-			score += 2
+
+	// Undecode any base64 and run again
+	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
+	regex := regexp.MustCompile(base64Regex)
+
+	base64_score := 0
+	base64Strings := regex.FindAllStringIndex(source, -1)
+	for _, indices := range base64Strings {
+		match := source[indices[0]:indices[1]]
+		decodedBytes, err := base64.StdEncoding.DecodeString(match)
+		if err == nil && utf8.Valid(decodedBytes) {
+			decodedStr := string(decodedBytes)
+			new_source := source[:indices[0]] + decodedStr + source[indices[1]:]
+			decodedMatches, new_score := GetMatchesForString(new_source, result)
+			base64_score = new_score
+			matches = append(matches, decodedMatches...)
 		}
 	}
-	if !GetFlags().NoAPIKeys {
-		for _, match := range MatchAPIKeys(source) {
+
+	if !GetFlags().NoKeywords {
+		for _, match := range MatchKeywords(source) {
 			matches = append(matches, match)
 			score += 2
 		}
@@ -376,6 +324,9 @@ func GetMatchesForString(source string, result RepoSearchResult) (matches []Matc
 	if GetFlags().NoScoring {
 		score = 10
 	}
+
+	score = score + (base64_score - len(base64Strings)*score)
+
 	return matches, score
 }
 
@@ -393,10 +344,7 @@ func containsCommonWord(str string) bool {
 		sumOfLengths += len(match)
 	}
 
-	if float64(sumOfLengths)/float64(len(str)) > 0.5 {
-		return false
-	}
-	return true
+	return float64(sumOfLengths)/float64(len(str)) < 0.5
 }
 
 func containsSequence(str string) bool {

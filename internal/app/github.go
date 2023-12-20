@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v57/github"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -58,15 +58,16 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	// fmt.Println(resp.StatusCode)
 	data, err := ioutil.ReadAll(resp.Body)
 	dataStr := string(data)
+	// fmt.Println(dataStr)
 	if strings.Index(dataStr, "Incorrect username or password.") > -1 {
-		return nil, fmt.Errorf("Incorrect username or password.") 
+		return nil, fmt.Errorf("Incorrect username or password.")
 	}
 	if strings.Index(dataStr, "app_otp") > -1 {
 		csrf, err = GrabCSRFTokenBody(dataStr)
 		if err != nil {
 			return nil, err
 		}
-
+		// fmt.Println(csrf)
 		otp := HandleOTPCode(credentials)
 
 		if strings.Index(resp.Request.URL.String(), "verified-device") > -1 {
