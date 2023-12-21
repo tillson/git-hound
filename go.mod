@@ -22,7 +22,7 @@ require (
 	github.com/subosito/gotenv v1.4.0 // indirect
 	github.com/waigani/diffparser v0.0.0-20190828052634-7391f219313d
 	github.com/xanzy/ssh-agent v0.3.1 // indirect
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
-	golang.org/x/net v0.9.0 // indirect
+	golang.org/x/crypto v0.14.0
+	golang.org/x/net v0.17.0 // indirect
 	gopkg.in/ini.v1 v1.66.6 // indirect
 )
