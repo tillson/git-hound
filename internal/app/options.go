@@ -7,7 +7,6 @@ type Flags struct {
 	DigRepo      bool
 	DigCommits   bool
 	RegexFile    string
-	LanguageFile string
 	ConfigFile   string
 	Pages        int
 	GithubRepo   bool

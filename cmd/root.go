@@ -24,7 +24,6 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules.toml", "Path to a list of regexes.")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GithubRepo, "github-repo", false, "Search in a specific Github Repo only.")
