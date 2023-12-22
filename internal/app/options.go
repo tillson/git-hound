@@ -20,7 +20,6 @@ type Flags struct {
 	FastMode     bool
 	Threads      int
 	Debug        bool
-	LegacySearch bool
 	NoGists      bool
 	NoRepos      bool
 	ManyResults  bool

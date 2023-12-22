@@ -28,7 +28,6 @@ type GitHubCredentials struct {
 // SearchOptions are the options that the GitHub search will use.
 type SearchOptions struct {
 	MaxPages int
-	Language string
 	github.SearchOptions
 }
 
@@ -202,12 +201,7 @@ func ConstructSearchURL(base string, query string, options SearchOptions) string
 	sb.WriteString("&p=" + strconv.Itoa(options.Page))
 	// sb.WriteString("&o=desc")    // + options.Order)
 	sb.WriteString("&s=indexed") // + options.Sort)
-	sb.WriteString("&l=" + options.Language)
-	if GetFlags().LegacySearch {
-		sb.WriteString("&type=codelegacy")
-	} else {
-		sb.WriteString("&type=code")
-	}
+	sb.WriteString("&type=code")
 	return sb.String()
 }
 
