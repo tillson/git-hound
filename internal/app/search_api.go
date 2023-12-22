@@ -45,13 +45,14 @@ func SearchWithAPI(queries []string) {
 		for page := 0; page <= int(math.Min(10, float64(GetFlags().Pages))); page++ {
 			options.Page = page
 			result, _, err := client.Search.Code(context.Background(), query, &options)
-			if err != nil {
-				color.Red("Error searching GitHub: " + err.Error())
+			for err != nil {
+				// color.Red("Error searching GitHub: " + err.Error())
 				time.Sleep(5 * time.Second)
 				backoff = backoff * 1.5
-				continue
+				result, _, err = client.Search.Code(context.Background(), query, &options)
 			}
-			backoff = math.Sqrt(backoff)
+
+			backoff = backoff / 1.5
 			backoff = math.Max(1, backoff)
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 				fmt.Println("Found " + strconv.Itoa(result.GetTotal()) + " matching repos...")
