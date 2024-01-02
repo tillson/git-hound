@@ -19,14 +19,16 @@ import (
 
 // RepoSearchResult represents a result in GitHub/Gist code search.
 type RepoSearchResult struct {
-	Repo          string
-	File          string
-	Raw           string
-	Source        string
-	Contents      string
-	Query         string
-	URL           string
-	searchOptions *SearchOptions
+	Repo                      string
+	File                      string
+	Raw                       string
+	Source                    string
+	Contents                  string
+	Query                     string
+	URL                       string
+	SourceFileLastUpdated     string
+	SourceFileLastAuthorEmail string
+	searchOptions             *SearchOptions
 }
 
 type NewSearchPayload struct {
@@ -85,11 +87,6 @@ func SearchWithUI(queries []string) {
 // Search Everything
 func Search(query string, client *http.Client) (results []RepoSearchResult, err error) {
 
-	var languages []string
-	if GetFlags().LanguageFile != "" {
-		languages = GetFileLines(GetFlags().LanguageFile)
-	}
-
 	options := SearchOptions{
 		MaxPages: 100,
 	}
@@ -98,15 +95,6 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 
 	// Rich GitHub search
 	if !GetFlags().NoRepos {
-		if len(languages) > 0 {
-			for _, language := range languages {
-				options.Language = language
-				err = SearchGitHub(query, options, client, &results, resultMap)
-				if err != nil {
-					color.Red("[!] Error searching GitHub for `" + query + "`")
-				}
-			}
-		}
 		if !GetFlags().OnlyFiltered {
 			err = SearchGitHub(query, options, client, &results, resultMap)
 			if err != nil {
@@ -118,15 +106,15 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 	// Gist search
 	if !GetFlags().NoGists {
 		resultMap = make(map[string]bool)
-		if len(languages) > 0 {
-			for _, language := range languages {
-				options.Language = language
-				err = SearchGist(query, options, client, &results, resultMap)
-				if err != nil {
-					color.Red("[!] Error searching Gist for `" + query + "`")
-				}
-			}
-		}
+		// if len(languages) > 0 {
+		// 	for _, language := range languages {
+		// 		options.Language = language
+		// 		err = SearchGist(query, options, client, &results, resultMap)
+		// 		if err != nil {
+		// 			color.Red("[!] Error searching Gist for `" + query + "`")
+		// 		}
+		// 	}
+		// }
 		if !GetFlags().OnlyFiltered {
 			err = SearchGist(query, options, client, &results, resultMap)
 			if err != nil {
@@ -157,7 +145,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 			}
 			for page < pages {
 				str := ConstructSearchURL(base, query, options)
-				fmt.Println(str)
+				// fmt.Println(str)
 				// fmt.Println(str)
 				response, err := client.Get(str)
 				// fmt.Println(response.StatusCode)
@@ -339,7 +327,7 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 						}
 					} else {
 						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of Gist results for '" + query + "'...")
 						}
 					}
 				} else {

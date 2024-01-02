@@ -135,7 +135,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 							searchMatches, searchScore := GetMatchesForString(string(ascii), result, true)
 							score += searchScore
 							// fmt.Println(searchMatches)
-							if searchScore > 1 {
+							if searchScore > -1 {
 								// fmt.Println(searchMatches)
 								for _, newMatch := range searchMatches {
 									newMatches = append(newMatches, newMatch)

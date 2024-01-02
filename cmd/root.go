@@ -3,17 +3,21 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
-	"github.com/BurntSushi/toml"
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/yaml.v2"
 
 	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
+
+	_ "net/http/pprof"
 )
 
 // InitializeFlags initializes GitHound's command line flags.
@@ -83,7 +87,28 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
-		toml.DecodeFile(app.GetFlags().RegexFile, &app.GetFlags().TextRegexes)
+		var allRules []app.Rule
+		if fileInfo, err := os.Stat(app.GetFlags().RegexFile); err == nil && fileInfo.IsDir() {
+			files, err := ioutil.ReadDir(app.GetFlags().RegexFile)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			for _, file := range files {
+				if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yaml" {
+					filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
+					rules := LoadRegexFile(filePath)
+					allRules = append(allRules, rules...)
+				}
+			}
+			app.GetFlags().TextRegexes = append(app.GetFlags().TextRegexes, allRules...)
+		} else {
+			rules := LoadRegexFile(app.GetFlags().RegexFile)
+			allRules = append(allRules, rules...)
+		}
+		app.GetFlags().TextRegexes = allRules
+
+		// fmt.Println(app.GetFlags().TextRegexes)
 
 		if app.GetFlags().SearchType == "ui" && viper.GetString("github_username") == "" {
 			color.Red("[!] GitHound run in UI mode but github_username not specified in config.yml. Update config.yml or run in API mode (flag: `--search-type api`)")
@@ -96,10 +121,37 @@ var rootCmd = &cobra.Command{
 		if app.GetFlags().SearchType == "ui" {
 			app.SearchWithUI(queries)
 		} else {
+			fmt.Println(1)
 			app.SearchWithAPI(queries)
 		}
 
 	},
+}
+
+func LoadRegexFile(path string) []app.Rule {
+	file, err := os.OpenFile(path, os.O_RDONLY, 0600)
+	if err != nil {
+		fmt.Errorf("Error opening file %v: %v", app.GetFlags().RegexFile, err)
+		os.Exit(1)
+	}
+	defer file.Close()
+
+	if err != nil {
+		fmt.Errorf("Error opening file %v: %v", app.GetFlags().RegexFile, err)
+		os.Exit(1)
+	}
+
+	dec := yaml.NewDecoder(file)
+	rule_config := app.RuleConfig{}
+	err = dec.Decode(&rule_config)
+	if err != nil {
+		fmt.Println(err)
+		// fmt.Errorf("Error loading config file %v: %v", app.GetFlags().RegexFile, err)
+		os.Exit(1)
+	}
+	fmt.Println(2)
+	return rule_config.Rules
+
 }
 
 func getScanner(args []string) *bufio.Scanner {

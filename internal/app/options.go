@@ -26,7 +26,7 @@ type Flags struct {
 	JsonOutput   bool
 	SearchType   string
 	OTPCode      string
-	TextRegexes  config
+	TextRegexes  []Rule
 }
 
 var flags Flags

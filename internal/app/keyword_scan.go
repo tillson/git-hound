@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
+	"github.com/google/go-github/v57/github"
+	"github.com/spf13/viper"
 )
 
 // ResultScan is the final scan result.
@@ -79,21 +82,38 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		}
 	} else {
 		matches, score := GetMatchesForString(repo.Contents, repo, true)
-		if repo.Source == "repo" && (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
+		if (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
 			scannedRepos[repo.Repo] = true
-			for _, match := range Dig(repo) {
-				matches = append(matches, match)
-			}
+			matches = append(matches, Dig(repo)...)
 		}
 
 		if len(matches) > 0 {
+			// fmt.Println((repo.Raw), "score:", score)
+
+			token := viper.GetString("github_access_token")
+			client := github.NewClient(nil).WithAuthToken(token)
+			if client != nil {
+				// gh_repo_obj, _, err := client.Repositories.Get(strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1])
+				// get repo's commits
+				commits, _, err := client.Repositories.ListCommits(context.Background(), strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1], &github.CommitsListOptions{
+					Path: repo.File,
+				})
+				if err != nil {
+					fmt.Println(err)
+					repo.SourceFileLastUpdated = ""
+				} else {
+					repo.SourceFileLastUpdated = commits[0].Commit.Author.Date.String()
+					repo.SourceFileLastAuthorEmail = *commits[0].Commit.Author.Email
+				}
+			}
+
 			resultRepoURL := GetRepoURLForSearchResult(repo)
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 				color.Green("[" + resultRepoURL + "]")
 			}
 			for _, result := range matches {
 				if slice_contains(result.Attributes, "api_key") {
-					if apiKeyMap[result.Text] == true {
+					if apiKeyMap[result.Text] {
 						continue
 					}
 					apiKeyMap[result.Text] = true
@@ -103,11 +123,13 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				} else {
 					if GetFlags().JsonOutput {
 						a, _ := json.Marshal(map[string]interface{}{
-							"repo":       resultRepoURL,
-							"context":    result.Line.Text,
-							"match":      result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
-							"attributes": result.Attributes,
-							"url":        GetResultLink(repo, result),
+							"repo":              resultRepoURL,
+							"context":           result.Line.Text,
+							"match":             result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
+							"attributes":        result.Attributes,
+							"file_last_updated": repo.SourceFileLastUpdated,
+							"file_last_author":  repo.SourceFileLastAuthorEmail,
+							"url":               GetResultLink(repo, result),
 						})
 						fmt.Println(string(a))
 					} else {
@@ -132,12 +154,16 @@ func MatchKeywords(source string) (matches []Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
-
+	// fmt.Println(len(source))
 	// Loop over regexes from database
-	for _, regex := range GetFlags().TextRegexes.Rules {
-		regexp := regex.Regex.RegExp
-		matchStrings := regexp.FindAllString(source, -1)
-		// fmt.Println(matchStrings)
+	for _, regex := range GetFlags().TextRegexes {
+		pcreRegex := regex.Pattern.RegExp
+
+		var matchStrings []string
+		matched := pcreRegex.FindAllIndex([]byte(source), 0)
+		for _, match := range matched {
+			matchStrings = append(matchStrings, source[match[0]:match[1]])
+		}
 		for _, match := range matchStrings {
 			shouldMatch := !regex.SmartFiltering
 			if regex.SmartFiltering {
@@ -147,9 +173,9 @@ func MatchKeywords(source string) (matches []Match) {
 			}
 			if shouldMatch {
 				matches = append(matches, Match{
-					Attributes: []string{regex.Name},
-					Text:       string(match),
-					Expression: regexp.String(),
+					Attributes: []string{regex.ID},
+					Text:       match,
+					Expression: "", // Or a method to get the string representation of the pattern
 					Line:       GetLine(source, match),
 				})
 			}
@@ -269,9 +295,10 @@ func GetMatchesForString(source string, result RepoSearchResult, recursion bool)
 	// Undecode any base64 and run again
 	base64Regex := "\\b[a-zA-Z0-9/+]*={0,2}\\b"
 	regex := regexp.MustCompile(base64Regex)
-
+	// fmt.Println(result)
 	base64_score := 0
 	var base64Strings [][]int
+	// fmt.Println("RECURSION", recursion)
 	if recursion {
 		base64Strings = regex.FindAllStringIndex(source, -1)
 		for _, indices := range base64Strings {
@@ -281,7 +308,7 @@ func GetMatchesForString(source string, result RepoSearchResult, recursion bool)
 				decodedStr := string(decodedBytes)
 				new_source := source[:indices[0]] + decodedStr + source[indices[1]:]
 				decodedMatches, new_score := GetMatchesForString(new_source, result, false)
-				base64_score = new_score
+				base64_score += new_score
 				matches = append(matches, decodedMatches...)
 			}
 		}
@@ -321,23 +348,23 @@ func GetMatchesForString(source string, result RepoSearchResult, recursion bool)
 				score += 3
 			}
 		}
-		regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
-			"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
-			"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
-		fileNameMatches := regex.FindAllString(result.File, -1)
-		CheckErr(err)
-		if len(fileNameMatches) > 0 {
-			score -= int(math.Pow(2, float64(len(fileNameMatches))))
-		}
+		// regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
+		// 	"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
+		// 	"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
+		// fileNameMatches := regex.FindAllString(result.File, -1)
+		// CheckErr(err)
+		// if len(fileNameMatches) > 0 {
+		// 	score -= int(math.Pow(2, float64(len(fileNameMatches))))
+		// }
 		if score <= 0 && !GetFlags().NoScoring {
 			matches = nil
 		}
 	}
 	if GetFlags().NoScoring {
-		score = 10
+		score = 1000
 	}
 
-	score = score + (base64_score - len(base64Strings)*score)
+	// score = score // + (base64_score - len(base64Strings)*score)
 
 	return matches, score
 }

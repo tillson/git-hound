@@ -42,7 +42,7 @@ func SearchWithAPI(queries []string) {
 
 	backoff := 1.0
 	for _, query := range queries {
-		for page := 0; page <= int(math.Min(10, float64(GetFlags().Pages))); page++ {
+		for page := 0; page < int(math.Min(10, float64(GetFlags().Pages))); page++ {
 			options.Page = page
 			result, _, err := client.Search.Code(context.Background(), query, &options)
 			for err != nil {
@@ -55,7 +55,7 @@ func SearchWithAPI(queries []string) {
 			backoff = backoff / 1.5
 			backoff = math.Max(1, backoff)
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-				fmt.Println("Found " + strconv.Itoa(result.GetTotal()) + " matching repos...")
+				fmt.Println("Found " + strconv.Itoa(result.GetTotal()) + " matching repos on page " + strconv.Itoa(page) + "...")
 			}
 			for _, code_result := range result.CodeResults {
 				// fmt.Println(*code_result.GetRepository())
