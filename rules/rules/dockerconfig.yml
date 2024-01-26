@@ -1,0 +1,4 @@
+rules:
+- name: Docker/kube secret
+  id: dockersecret.custom
+  pattern: '"auth":\s*".*"'

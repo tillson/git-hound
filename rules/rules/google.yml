@@ -1,0 +1,124 @@
+rules:
+
+- name: Google Client ID
+  id: np.google.1
+
+  pattern: '(?i)\b([0-9]+-[a-z0-9_]{32})\.apps\.googleusercontent\.com'
+
+  examples:
+  - "                 'clientID' : '231545488769-4d1mcev9vifvlncrern52id2pqqf5u5l.apps.googleusercontent.com',"
+  - "                //$google_client_id     = '244082345999-o6m8f1pmb1e76tjfj9v7b96j31e53ps5.apps.googleusercontent.com';"
+  - "      GOOGLE_OAUTH2_CLIENT_ID = '607830223128-4qgthc7ofdqce232dk690t5jgkm1ce33.apps.googleusercontent.com'"
+  - '          $cordovaOauth.google("653512027492-5u9blotr1521fa0lo1172nhv4pmqgttq.apps.googleusercontent.com", ["email"]).then(function(result) {'
+
+
+- name: Google OAuth Client Secret (prefixed)
+  id: np.google.2
+
+  pattern: |
+    (?x)
+    \b
+    (GOCSPX-[a-zA-Z0-9_-]{28})
+    (?:[^a-zA-Z0-9_-] | $)
+
+  examples:
+  - 'const CLIENTSECRET = "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"'
+
+- name: Google OAuth Client Secret
+  id: np.google.3
+
+  pattern: |
+    (?x)(?i)
+    client.?secret .{0,10}
+    \b
+    ([a-z0-9_-]{24})
+    (?: [^a-z0-9_-] |$)
+
+  examples:
+  - '"client_secret":"aaaaaaaaaaaaaaaaaaaaaaa-"'
+  - "                 //$google_client_secret = 'fnhqAakzWrX-mtFQ4PRdMoy0';"
+  - "                'clientSecret' : 'Ufvuj-d6alhwGKvvLh_8Nq0K'"
+
+
+- name: Google OAuth Access Token
+  id: np.google.4
+
+  pattern: |
+    (?x)
+    \b
+    (ya29\.[0-9A-Za-z_-]{20,1024})
+    (?: [^0-9A-Za-z_-]|$)  (?# Used instead of `\b` because that doesn't play well with trailing `-` )
+
+  examples:
+  - |
+      const setupCredentials = () => {
+      const { encryptedData, iv } = encrypt({
+        expiry_date: 1642441058842,
+        access_token:
+          'ya29.A0ARrdaM--PV_87ebjywDJpXKb77NBFJl16meVUapYdfNv6W6ZzCu947fNaPaRjbDbOIIcp6f49cMaX5ndK9TAFnKwlVqz3nrK9nLKqgyDIhYsIq47smcAIZkK56SWPx3X3DwAFqRu2UPojpd2upWwo-3uJrod',
+        // This token is linked to a test Google account (typebot.test.user@gmail.com)
+        refresh_token:
+          '1//039xWRt8YaYa3CgYIARAAGAMSNwF-L9Iru9FyuTrDSa7lkSceggPho83kJt2J29Ga91EhT1C6XV1vmo6bQS9puL_R2t8FIwR3gek',
+      })
+  - |
+      -- Clear login if it's a new connection.
+      --propertyTable.access_token = 'ya29.Ci_UA7aEsvT6-oVI8f96kvB6i8oO13WgdZUviLaCVtpEPYZqhQcQycR-u2X9xtmYGA'
+
+
+- name: Google API Key
+  id: np.google.5
+
+  pattern: '\b(AIza[0-9A-Za-z_-]{35})\b'
+  references:
+  - https://cloud.google.com/docs/authentication/api-keys#securing
+  - https://support.google.com/googleapi/answer/6310037
+
+  examples:
+  - "  var DEVELOPER_KEY = 'AIzaSyB4sU8lU15bR_87qNb7eUVQN72_vv8mpbU';"
+
+
+- name: Google Cloud Storage Bucket (subdomain style)
+  id: np.gcs.1
+
+  pattern: |
+    (?x)
+    (?: ^ | [\s/"'] | %2F )
+    (
+    (?: [a-zA-Z0-9_-]+ \. )+    (?# bucket name as subdomain )
+    storage\.googleapis\.com
+    )
+    \b
+
+  references:
+  - https://cloud.google.com/storage/docs/request-endpoints
+
+  examples:
+  - 'c.storage.googleapis.com'
+  - 'some-bucket.example.com.storage.googleapis.com'
+
+  negative_examples:
+  - 'https://storage.googleapis.com'
+
+
+- name: Google Cloud Storage Bucket (path style)
+  id: np.gcs.2
+
+  pattern: |
+    (?x)
+    (?: ^ | [\s/"'] | %2F )
+    (
+    storage\.googleapis\.com
+    /
+    [a-zA-Z0-9_-]+ (?: \. [a-zA-Z0-9_-]+ )*    (?# bucket name as path )
+    )
+    (?: [^a-zA-Z0-9_-] | $ )                   (?# this instead of a \b anchor because that doesn't play nicely with `-` )
+
+  references:
+  - https://cloud.google.com/storage/docs/request-endpoints
+
+  negative_examples:
+  - 'c.storage.googleapis.com/some_object'
+  - 'some-bucket.example.com.storage.googleapis.com/some_object'
+
+  examples:
+  - 'https://storage.googleapis.com/bucket_name/object_name'

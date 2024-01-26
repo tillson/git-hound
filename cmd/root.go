@@ -121,7 +121,7 @@ var rootCmd = &cobra.Command{
 		if app.GetFlags().SearchType == "ui" {
 			app.SearchWithUI(queries)
 		} else {
-			fmt.Println(1)
+			// fmt.Println(1)
 			app.SearchWithAPI(queries)
 		}
 
@@ -149,7 +149,7 @@ func LoadRegexFile(path string) []app.Rule {
 		// fmt.Errorf("Error loading config file %v: %v", app.GetFlags().RegexFile, err)
 		os.Exit(1)
 	}
-	fmt.Println(2)
+	// fmt.Println(2)
 	return rule_config.Rules
 
 }
