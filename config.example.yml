@@ -6,8 +6,8 @@
 github_access_token: "API_TOKEN"
 
 # Use with `--search-type ui` flag
-github_username: "username"
-github_password: "your_password"
+#github_username: "username"
+#github_password: "your_password"
 
 
 
