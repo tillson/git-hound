@@ -2,8 +2,14 @@
 # DO NOT CHECK YOUR USERNAME AND PASSWORD INTO GIT!
 
 # Required
-github_username: "username"
-github_password: "your_password"
+# Use with `--search-type api` flag
+github_access_token: "API_TOKEN"
+
+# Use with `--search-type ui` flag
+#github_username: "username"
+#github_password: "your_password"
+
+
 
 # Optional (comment out if not using)
 # github_totp_seed: "ABCDEF1234567890" # Obtained via https://github.com/settings/security
