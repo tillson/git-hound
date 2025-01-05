@@ -7,21 +7,22 @@ import (
 )
 
 type RuleConfig struct {
-	Rules []Rule `yaml:"rules"`
+	Rules []Rule `yaml:"rules,omitempty"`
 }
 
 type Rule struct {
-	ID             string       `yaml:"id"`
-	Pattern        regexwrapper `yaml:"pattern"`
-	Description    string       `yaml:"name"`
-	SmartFiltering bool         `yaml:"smart_filtering"`
+	ID             string       `yaml:"id" toml:"id"`
+	Pattern        RegexWrapper `yaml:"pattern"`
+	StringPattern  string       `toml:"regex"`
+	Description    string       `yaml:"name" toml:"description"`
+	SmartFiltering bool         `yaml:"smart_filtering" toml:"smart_filtering"`
 }
 
-type regexwrapper struct {
+type RegexWrapper struct {
 	RegExp pcre.Regexp
 }
 
-func (r *regexwrapper) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (r *RegexWrapper) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var patternText string
 	// First, unmarshal the text as a string
 	if err := unmarshal(&patternText); err != nil {

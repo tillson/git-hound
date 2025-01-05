@@ -43,7 +43,7 @@ GitHound utilizes a database of API key regexes maintained by the [Gitleaks](htt
 
 Knowing the pattern for a specific service's API keys enables you to search GitHub for these keys. You can then pipe matches for your custom key regex into your own script to test the API key against the service and to identify the at-risk account.
 
-`echo "api.halcorp.biz" | githound --dig-files --dig-commits --many-results --regex-file halcorp-api-regexes.txt --results-only | python halapitester.py`
+`echo "api.halcorp.biz" | githound --dig-files --dig-commits --many-results --rules halcorp-api-regexes.txt --results-only | python halapitester.py`
 
 For detecting future API key leaks, GitHub offers [Push Token Scanning](https://help.github.com/en/articles/about-token-scanning) to immediately detect API keys as they are posted.
 
@@ -62,34 +62,43 @@ For files that encode secrets, decodes base64 strings and searches the encoded s
 Check out this [blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/) for more details on use cases and methodologies.
 
 ## Flags
+GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a robust scoring system.
 ```
 Usage:
   githound [flags]
 
 Flags:
-      --config-file string      Supply the path to a config file.
-      --debug                   Enables verbose debug logging.
-      --dig-commits             Dig through commit history to find more secrets (CPU intensive).
-      --dig-files               Dig through the repo's files to find more secrets (CPU intensive).
-      --filtered-only           Only print filtered results (language files)
-      --github-repo             Search in a specific Github Repo only.
-  -h, --help                    help for githound
-      --json                    Print results in JSON format
-      --language-file string    Supply your own list of languages to search (java, python).
-      --legacy                  Use the legacy search method.
-      --many-results            Search >100 pages with filtering hack
-      --no-api-keys             Don't search for generic API keys.
-      --no-files                Don't search for interesting files.
-      --no-gists                Don't search Gists
-      --no-keywords             Don't search for built-in keywords
-      --no-repos                Don't search repos
-      --no-scoring              Don't use scoring to filter out false positives.
-      --otp-code string         Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)
-      --pages int               Maximum pages to search per query (default 100)
-      --regex-file string       Path to a list of regexes. (default "rules.toml")
-      --results-only            Only print match strings.
-      --subdomain-file string   A file containing a list of subdomains (or other queries).
-      --threads int             Threads to dig with (default 20)
+      --query string         A query stiing (alternativ, pass through stdin)
+      --config-file string   Supply the path to a config file.
+      --json                 Print results in JSON format
+      --rules string         Path to a list of regexes or a GitLeaks rules folder.
+      -h, --help                 help for githound
+
+      --pages int            Maximum pages to search per query (default 100)
+      --github-repo          Search in a specific Github Repo only.
+      --fast                 Skip file grepping and only return search preview
+      --all-results          Print all results, even if they do not contain secrets
+      --many-results         Search >100 pages with results sorting hack
+
+      --dig-commits          Dig through commit history to find more secrets (CPU intensive).
+      --dig-files            Dig through the repo's files to find more secrets (CPU intensive).
+      --threads int          Threads to dig with (default 20)```
+
+      --results-only         Only print match strings.
+      --search-type api      Search interface (api or `ui`). API requires api_key in config, UI requires username/password
+
+      --otp-code string      Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)
+
+      --query-file string    A file containing a list of subdomains (or other queries).
+      --filtered-only        Only print filtered results (language files)
+      --debug                Enables verbose debug logging.
+  
+      --no-api-keys          Don't search for generic API keys.
+      --no-files             Don't search for interesting files.
+      --no-gists             Don't search Gists
+      --no-keywords          Don't search for built-in keywords
+      --no-repos             Don't search repos
+      --no-scoring           Don't use scoring to filter out false positives.
 ```
 
 ## Development
@@ -146,23 +155,10 @@ docker run -v /path/to/config.yaml:/root/.githound/config.yaml -v $(pwd)/data:/d
 
 Replace `/path/to/config.yaml` with the actual path to your `config.yaml` file. The `-v $(pwd)/data:/data` part mounts a directory containing your input files (`subdomains.txt`) into the container.
 
-#### Notes
-- Ensure your `config.yaml` and input files' paths are correct when running the Docker container.
-- This setup assumes `git-hound` is compatible with the provided configuration and command-line arguments.
-- For any updates or changes to `git-hound`, rebuild the Docker image.
-
 ---
 
-
-## User feedback
-
-These are discussions about how people use GitHound in their workflows and how we can GitHound to fufill those needs. If you use GitHound, consider leaving a note in one of the active issues.
-[List of issues requesting user feedback](https://github.com/tillson/git-hound/issues?q=is%3Aissue+is%3Aopen+label%3A%22user+feedback+requested%22)
-
-## 💰 Premium Monitoring & Engagements
-Would you like to gain greater visibility into your company's GitHub presence? We use GitHound as one small part of a larger system that can find credential leaks and sensitive/proprietary information across open-source websites like GitHub and DockerHub. We offer continuous monitoring services of *all of GitHub* (not just accounts you know are held by employees!) and red-team engagements/consulting services.
-
-Reach out here to learn more: https://secretsurfer.xyz.
+## Premium Support Options
+Bug fixes and occasional feature enhancements are provided open-source. Technical support and integration requests are available at a rate of 35 USD/hour and can be arranged by contacting tillson@secretsurfer.xyz.
 
 ## References
 

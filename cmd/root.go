@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/GRbit/go-pcre"
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
@@ -14,6 +15,7 @@ import (
 
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
 
@@ -27,7 +29,9 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query stiing (default: stdin)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules.toml", "Path to a list of regexes.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "rules", "rules/rules-noseyparker", "Path to a list of regexes or a GitLeaks rules folder.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules/rules-noseyparker", "Alias for the 'rules' flag.")
+	rootCmd.PersistentFlags().MarkHidden("regex-file")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GithubRepo, "github-repo", false, "Search in a specific Github Repo only.")
@@ -88,6 +92,8 @@ var rootCmd = &cobra.Command{
 		}
 
 		var allRules []app.Rule
+		// fmt.Println(app.GetFlags().RegexFile)
+		// If rules is a directory, load all rules files in GitLeaks YML format
 		if fileInfo, err := os.Stat(app.GetFlags().RegexFile); err == nil && fileInfo.IsDir() {
 			files, err := ioutil.ReadDir(app.GetFlags().RegexFile)
 			if err != nil {
@@ -95,17 +101,22 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			for _, file := range files {
-				if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yaml" {
-					filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
-					rules := LoadRegexFile(filePath)
-					allRules = append(allRules, rules...)
-				}
+				// if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yml" {
+				filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
+				rules := LoadRegexFile(filePath)
+				allRules = append(allRules, rules...)
+				// }
 			}
 			app.GetFlags().TextRegexes = append(app.GetFlags().TextRegexes, allRules...)
 		} else {
+			// Otherwise, resort to regex list in txt file or legacy TOML files
 			rules := LoadRegexFile(app.GetFlags().RegexFile)
 			allRules = append(allRules, rules...)
 		}
+		if len(allRules) == 0 {
+			color.Yellow("[!] 0 rules loaded. Using an empty ruleset may result in lousy performance. Consider using one of the rulesets provided with the GitHound installation or available from https://github.com/tillson/git-hound.")
+		}
+
 		app.GetFlags().TextRegexes = allRules
 
 		// fmt.Println(app.GetFlags().TextRegexes)
@@ -131,26 +142,66 @@ var rootCmd = &cobra.Command{
 func LoadRegexFile(path string) []app.Rule {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0600)
 	if err != nil {
-		fmt.Errorf("Error opening file %v: %v", app.GetFlags().RegexFile, err)
-		os.Exit(1)
+		color.Yellow("[!} Error opening rules file %v: %v", app.GetFlags().RegexFile+"", err)
 	}
 	defer file.Close()
 
-	if err != nil {
-		fmt.Errorf("Error opening file %v: %v", app.GetFlags().RegexFile, err)
-		os.Exit(1)
-	}
-
 	dec := yaml.NewDecoder(file)
-	rule_config := app.RuleConfig{}
-	err = dec.Decode(&rule_config)
+	ruleConfig := app.RuleConfig{}
+	err = dec.Decode(&ruleConfig)
 	if err != nil {
-		fmt.Println(err)
-		// fmt.Errorf("Error loading config file %v: %v", app.GetFlags().RegexFile, err)
-		os.Exit(1)
+		_, err := toml.DecodeFile(path, &ruleConfig)
+
+		if err != nil {
+			// fmt.Println("Resorting to .txt")
+			file, _ := os.Open(path)
+			defer file.Close()
+			scanner := bufio.NewScanner(file)
+			idCount := 1
+
+			for scanner.Scan() {
+				line := scanner.Text()
+				// fmt.Println(line)
+				// Assuming each line is a regex pattern, we create a Rule from it
+				compiled, err := pcre.Compile(line, 0)
+				if err != nil {
+					fmt.Printf("Unable to parse regex `%s` in TXT file.\n", line)
+					continue
+				}
+
+				// Create a new rule
+				rule := app.Rule{
+					ID:             fmt.Sprintf("Rule-%d", idCount), // Incremental ID
+					Pattern:        app.RegexWrapper{RegExp: compiled},
+					StringPattern:  line,                                            // Store the original pattern as StringPattern
+					Description:    fmt.Sprintf("Description for Rule-%d", idCount), // Incremental description
+					SmartFiltering: false,                                           // Default to false, you can modify if needed
+				}
+
+				// Add the rule to the config
+				ruleConfig.Rules = append(ruleConfig.Rules, rule)
+
+				idCount++ // Increment the rule ID counter
+			}
+		} else {
+			// Convert StringPattern to Pattern for TOML
+			for i, rule := range ruleConfig.Rules {
+				if rule.StringPattern != "" {
+					compiled, err := pcre.Compile(rule.StringPattern, 0)
+					if err != nil {
+						// fmt.Println("Unable to parse regex `" + rule.StringPattern + "` in TOML file.")
+					}
+					ruleConfig.Rules[i].Pattern = app.RegexWrapper{RegExp: compiled}
+
+				}
+			}
+			// fmt.Println("Parsed as TOML")
+		}
+	} else {
+		// fmt.Println("Parsed as YML")
 	}
 	// fmt.Println(2)
-	return rule_config.Rules
+	return ruleConfig.Rules
 
 }
 
@@ -183,7 +234,7 @@ func ReadConfig() {
 	err := viper.ReadInConfig()
 	if err != nil {
 		if app.GetFlags().ConfigFile != "" {
-			color.Red("[!] '" + app.GetFlags().ConfigFile + "' was not found. Please check the file path and try again.")
+			color.Red("[!] Config file '" + app.GetFlags().ConfigFile + "' was not found. Please specify a correct config path with `--config-file`.")
 
 		} else {
 			color.Red("[!] config.yml was not found. Please ensure config.yml exists in current working directory or $HOME/.githound/, or use flag `--config [config_path]`.")

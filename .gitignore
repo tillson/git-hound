@@ -3,3 +3,5 @@ git-hound
 .goreleaser.yaml
 
 dist/
+.venv
+output*
