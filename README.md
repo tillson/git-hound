@@ -23,6 +23,7 @@ More information is available in the [accompanying blog post](https://tillsongal
 ## Setup
 
 1. Download latest version of GitHound for Linux systems at https://github.com/tillson/git-hound/releases (with wget [url] or from the web browser).
+2. Install `libpcre3-dev` or `libpcre++-dev` using `brew install pcre` or `apt-get install libpcre3-dev` or similar
 2. Decompress the download with tar -xzf [filename]. You may have to navigate to the Downloads folder with `cd` first.
 3. `cd` into the now decompressed folder and configure GitHound by creating a `config.yml` file (either in the same directory as the `git-hound` binary or in `~/.githound`). There's an example config [here](https://github.com/tillson/git-hound/blob/master/config.example.yml). Make sure your username and password is in "quotation marks" and that you rename the `config.example.yml` file to `config.yml`.
 4. Run `./git-hound` to test (make sure you're in the correct directory!)

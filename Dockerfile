@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Install git-hound
 RUN git clone https://github.com/tillson/git-hound.git
+RUN apt-get install libpcre3-dev
 RUN cd git-hound && go build -o /usr/local/bin/git-hound
 
 # Copy the locally required files to the container
