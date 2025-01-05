@@ -6,33 +6,37 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 	"sync"
+	"time"
 
 	"github.com/fatih/color"
+	"github.com/spf13/viper"
 )
 
 // RepoSearchResult represents a result in GitHub/Gist code search.
 type RepoSearchResult struct {
-	Repo          string
-	File          string
-	Raw           string
-	Source        string
-	Contents        string
-	Query         string
-	URL           string
-	searchOptions *SearchOptions
+	Repo                      string
+	File                      string
+	Raw                       string
+	Source                    string
+	Contents                  string
+	Query                     string
+	URL                       string
+	SourceFileLastUpdated     string
+	SourceFileLastAuthorEmail string
+	searchOptions             *SearchOptions
 }
 
 type NewSearchPayload struct {
 	Payload struct {
 		Results []struct {
-			RepoNwo      string `json:"repo_nwo"`
-			RepoName      string `json:"repo_name"`
-			Path          string `json:"path"`
+			RepoNwo   string `json:"repo_nwo"`
+			RepoName  string `json:"repo_name"`
+			Path      string `json:"path"`
 			CommitSha string `json:"commit_sha"`
 			// Repository struct {
 			// }
@@ -43,29 +47,54 @@ type NewSearchPayload struct {
 
 var SearchWaitGroup sync.WaitGroup
 
+func SearchWithUI(queries []string) {
+	client, err := LoginToGitHub(GitHubCredentials{
+		Username: viper.GetString("github_username"),
+		Password: viper.GetString("github_password"),
+		OTP:      viper.GetString("github_totp_seed"),
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		color.Red("[!] Unable to login to GitHub. Please check your username/password credentials.")
+		os.Exit(1)
+	}
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
+	}
+	for _, query := range queries {
+		_, err = Search(query, client)
+		if err != nil {
+			color.Red("[!] Unable to collect search results for query '" + query + "'.")
+			break
+		}
+	}
+	// size, err := app.DirSize("/tmp/githound")
+	// if err == nil && size > 50e+6 {
+	// 	app.ClearRepoStorage()
+	// }
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Green("Finished searching... Now waiting for scanning to finish.")
+	}
+
+	SearchWaitGroup.Wait()
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+		color.Green("Finished scanning.")
+	}
+
+}
+
 // Search Everything
 func Search(query string, client *http.Client) (results []RepoSearchResult, err error) {
-
-	var languages []string
-	if GetFlags().LanguageFile != "" {
-		languages = GetFileLines(GetFlags().LanguageFile)
-	}
 
 	options := SearchOptions{
 		MaxPages: 100,
 	}
 
 	resultMap := make(map[string]bool)
+
+	// Rich GitHub search
 	if !GetFlags().NoRepos {
-		if len(languages) > 0 {
-			for _, language := range languages {
-				options.Language = language
-				err = SearchGitHub(query, options, client, &results, resultMap)
-				if err != nil {
-					color.Red("[!] Error searching GitHub for `" + query + "`")
-				}
-			}
-		}
 		if !GetFlags().OnlyFiltered {
 			err = SearchGitHub(query, options, client, &results, resultMap)
 			if err != nil {
@@ -73,17 +102,19 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 			}
 		}
 	}
+
+	// Gist search
 	if !GetFlags().NoGists {
 		resultMap = make(map[string]bool)
-		if len(languages) > 0 {
-			for _, language := range languages {
-				options.Language = language
-				err = SearchGist(query, options, client, &results, resultMap)
-				if err != nil {
-					color.Red("[!] Error searching Gist for `" + query + "`")
-				}
-			}
-		}
+		// if len(languages) > 0 {
+		// 	for _, language := range languages {
+		// 		options.Language = language
+		// 		err = SearchGist(query, options, client, &results, resultMap)
+		// 		if err != nil {
+		// 			color.Red("[!] Error searching Gist for `" + query + "`")
+		// 		}
+		// 	}
+		// }
 		if !GetFlags().OnlyFiltered {
 			err = SearchGist(query, options, client, &results, resultMap)
 			if err != nil {
@@ -102,6 +133,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 	} else {
 		base = "https://github.com/search"
 	}
+	// fmt.Println(base)
 	page, pages := 0, 1
 	var delay = 5
 	orders := []string{"asc"}
@@ -113,6 +145,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 			}
 			for page < pages {
 				str := ConstructSearchURL(base, query, options)
+				// fmt.Println(str)
 				// fmt.Println(str)
 				response, err := client.Get(str)
 				// fmt.Println(response.StatusCode)
@@ -138,6 +171,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 				}
 				responseData, err := ioutil.ReadAll(response.Body)
 				responseStr := string(responseData)
+
 				// fmt.Println(responseStr)
 
 				if err != nil {
@@ -150,8 +184,9 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 					if len(matches) == 0 {
 						resultRegex = regexp.MustCompile("(?s)react-app\\.embeddedData\">(.*?)<\\/script>")
 						match := resultRegex.FindStringSubmatch(responseStr)
+						// fmt.Println(match)
 						var resultPayload NewSearchPayload
-						
+
 						if len(match) == 0 {
 							page++
 							continue
@@ -218,7 +253,7 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							}
 							if result.RepoName == "" {
 								result.RepoName = result.RepoNwo
-							}	
+							}
 							resultSet[(result.RepoName + result.Path)] = true
 							SearchWaitGroup.Add(1)
 							go ScanAndPrintResult(client, RepoSearchResult{
@@ -228,11 +263,11 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 								Source: "repo",
 								Query:  query,
 								URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
-							})	
+							})
 							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
-						}	
+						}
 					}
-				} 
+				}
 				options.Page = (page + 1)
 			}
 
@@ -292,7 +327,7 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 						}
 					} else {
 						if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of results for '" + query + "'...")
+							color.Cyan("[*] Searching " + strconv.Itoa(pages) + " pages of Gist results for '" + query + "'...")
 						}
 					}
 				} else {

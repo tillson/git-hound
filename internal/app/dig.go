@@ -97,7 +97,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 				return matches
 			}
 
-			matchMap := make(map[Match]bool)
+			// matchMap := make(map[Match]bool)
 			if GetFlags().DigRepo {
 				// search current repo state
 				root := "/tmp/githound/" + result.Repo
@@ -129,13 +129,13 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 							newMatches = append(newMatches, match)
 							score += 5
 						}
-						if float32(len(ascii))/float32(len(data)) < 0.7 {
+						if float32(len(ascii))/float32(len(data)) < 0.9 {
 							// fmt.Println("skipping: " + file)
 						} else {
-							searchMatches, searchScore := GetMatchesForString(string(ascii), result)
+							searchMatches, searchScore := GetMatchesForString(string(ascii), result, true)
 							score += searchScore
 							// fmt.Println(searchMatches)
-							if searchScore > 1 {
+							if searchScore > -1 {
 								// fmt.Println(searchMatches)
 								for _, newMatch := range searchMatches {
 									newMatches = append(newMatches, newMatch)
@@ -148,10 +148,10 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 								relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
 								match.CommitFile = relPath
 								match.File = relPath
-								if !matchMap[match] {
-									matchMap[match] = true
-									matches = append(matches, match)
-								}
+								// if !matchMap[match] {
+								// 	matchMap[match] = true
+								// 	matches = append(matches, match)
+								// }
 							}
 						}
 					} else {
@@ -196,10 +196,10 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						diffMatches := ScanDiff(lastHash, commitTree, result)
 						for _, match := range diffMatches {
 							match.Commit = c.Hash.String()
-							if !matchMap[match] {
-								matchMap[match] = true
-								matches = append(matches, match)
-							}
+							// if !matchMap[match] {
+							// 	matchMap[match] = true
+							// 	matches = append(matches, match)
+							// }
 						}
 						lastHash = commitTree
 						return nil
@@ -257,7 +257,7 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if err != nil {
 			log.Fatal(err)
 		}
-		matches, _ = GetMatchesForString(patchStr, result)
+		matches, _ = GetMatchesForString(patchStr, result, true)
 		for _, diffFile := range diffData.Files {
 			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
 				matches = append(matches, match)

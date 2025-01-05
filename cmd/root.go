@@ -3,34 +3,41 @@ package cmd
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
-	"github.com/BurntSushi/toml"
+	"github.com/GRbit/go-pcre"
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
+	"gopkg.in/yaml.v2"
 
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"github.com/spf13/cobra"
 	"github.com/tillson/git-hound/internal/app"
+
+	_ "net/http/pprof"
 )
 
 // InitializeFlags initializes GitHound's command line flags.
 func InitializeFlags() {
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SearchType, "search-type", "", "Search interface (`api` or `ui`).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().QueryFile, "query-file", "", "A file containing a list of subdomains (or other queries).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query stiing (default: stdin)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules.toml", "Path to a list of regexes.")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().LanguageFile, "language-file", "", "Supply your own list of languages to search (java, python).")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "rules", "rules/rules-noseyparker", "Path to a list of regexes or a GitLeaks rules folder.")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "regex-file", "rules/rules-noseyparker", "Alias for the 'rules' flag.")
+	rootCmd.PersistentFlags().MarkHidden("regex-file")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ConfigFile, "config-file", "", "Supply the path to a config file.")
 	rootCmd.PersistentFlags().IntVar(&app.GetFlags().Pages, "pages", 100, "Maximum pages to search per query")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().GithubRepo, "github-repo", false, "Search in a specific Github Repo only.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().ResultsOnly, "results-only", false, "Only print match strings.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoAPIKeys, "no-api-keys", false, "Don't search for generic API keys.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoScoring, "no-scoring", false, "Don't use scoring to filter out false positives.")
-	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().LegacySearch, "legacy", false, "Use the legacy search method.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoFiles, "no-files", false, "Don't search for interesting files.")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoKeywords, "no-keywords", false, "Don't search for built-in keywords")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().ManyResults, "many-results", false, "Search >100 pages with filtering hack")
@@ -79,43 +86,123 @@ var rootCmd = &cobra.Command{
 			}
 		}
 		if len(queries) == 0 {
-			color.Red("[!] No search queries specified.")
+			color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
 			os.Exit(1)
 			return
 		}
 
-		client, err := app.LoginToGitHub(app.GitHubCredentials{
-			Username: viper.GetString("github_username"),
-			Password: viper.GetString("github_password"),
-			OTP:      viper.GetString("github_totp_seed"),
-		})
+		var allRules []app.Rule
+		// fmt.Println(app.GetFlags().RegexFile)
+		// If rules is a directory, load all rules files in GitLeaks YML format
+		if fileInfo, err := os.Stat(app.GetFlags().RegexFile); err == nil && fileInfo.IsDir() {
+			files, err := ioutil.ReadDir(app.GetFlags().RegexFile)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			for _, file := range files {
+				// if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yml" {
+				filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
+				rules := LoadRegexFile(filePath)
+				allRules = append(allRules, rules...)
+				// }
+			}
+			app.GetFlags().TextRegexes = append(app.GetFlags().TextRegexes, allRules...)
+		} else {
+			// Otherwise, resort to regex list in txt file or legacy TOML files
+			rules := LoadRegexFile(app.GetFlags().RegexFile)
+			allRules = append(allRules, rules...)
+		}
+		if len(allRules) == 0 {
+			color.Yellow("[!] 0 rules loaded. Using an empty ruleset may result in lousy performance. Consider using one of the rulesets provided with the GitHound installation or available from https://github.com/tillson/git-hound.")
+		}
 
-		if err != nil {
-			fmt.Println(err)
-			color.Red("[!] Unable to login to GitHub.")
+		app.GetFlags().TextRegexes = allRules
+
+		// fmt.Println(app.GetFlags().TextRegexes)
+
+		if app.GetFlags().SearchType == "ui" && viper.GetString("github_username") == "" {
+			color.Red("[!] GitHound run in UI mode but github_username not specified in config.yml. Update config.yml or run in API mode (flag: `--search-type api`)")
+			os.Exit(1)
+		} else if app.GetFlags().SearchType == "api" && viper.GetString("github_access_token") == "" {
+			color.Red("[!] GitHound run in API mode but github_access_token not specified in config.yml. Update config.yml or run in UI mode (flag: `--search-type ui`)")
 			os.Exit(1)
 		}
-		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
-			color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
-		}
-		toml.DecodeFile(app.GetFlags().RegexFile, &app.GetFlags().TextRegexes)
-		for _, query := range queries {
-			_, err = app.Search(query, client)
-			if err != nil {
-				color.Red("[!] Unable to collect search results for query '" + query + "'.")
-				break
-			}
-		}
-		size, err = app.DirSize("/tmp/githound")
-		if err == nil && size > 50e+6 {
-			app.ClearRepoStorage()
-		}
-		if !app.GetFlags().ResultsOnly && !app.GetFlags().JsonOutput {
-			color.Green("Finished.")
+
+		if app.GetFlags().SearchType == "ui" {
+			app.SearchWithUI(queries)
+		} else {
+			// fmt.Println(1)
+			app.SearchWithAPI(queries)
 		}
 
-		app.SearchWaitGroup.Wait()
 	},
+}
+
+func LoadRegexFile(path string) []app.Rule {
+	file, err := os.OpenFile(path, os.O_RDONLY, 0600)
+	if err != nil {
+		color.Yellow("[!} Error opening rules file %v: %v", app.GetFlags().RegexFile+"", err)
+	}
+	defer file.Close()
+
+	dec := yaml.NewDecoder(file)
+	ruleConfig := app.RuleConfig{}
+	err = dec.Decode(&ruleConfig)
+	if err != nil {
+		_, err := toml.DecodeFile(path, &ruleConfig)
+
+		if err != nil {
+			// fmt.Println("Resorting to .txt")
+			file, _ := os.Open(path)
+			defer file.Close()
+			scanner := bufio.NewScanner(file)
+			idCount := 1
+
+			for scanner.Scan() {
+				line := scanner.Text()
+				// fmt.Println(line)
+				// Assuming each line is a regex pattern, we create a Rule from it
+				compiled, err := pcre.Compile(line, 0)
+				if err != nil {
+					fmt.Printf("Unable to parse regex `%s` in TXT file.\n", line)
+					continue
+				}
+
+				// Create a new rule
+				rule := app.Rule{
+					ID:             fmt.Sprintf("Rule-%d", idCount), // Incremental ID
+					Pattern:        app.RegexWrapper{RegExp: compiled},
+					StringPattern:  line,                                            // Store the original pattern as StringPattern
+					Description:    fmt.Sprintf("Description for Rule-%d", idCount), // Incremental description
+					SmartFiltering: false,                                           // Default to false, you can modify if needed
+				}
+
+				// Add the rule to the config
+				ruleConfig.Rules = append(ruleConfig.Rules, rule)
+
+				idCount++ // Increment the rule ID counter
+			}
+		} else {
+			// Convert StringPattern to Pattern for TOML
+			for i, rule := range ruleConfig.Rules {
+				if rule.StringPattern != "" {
+					compiled, err := pcre.Compile(rule.StringPattern, 0)
+					if err != nil {
+						// fmt.Println("Unable to parse regex `" + rule.StringPattern + "` in TOML file.")
+					}
+					ruleConfig.Rules[i].Pattern = app.RegexWrapper{RegExp: compiled}
+
+				}
+			}
+			// fmt.Println("Parsed as TOML")
+		}
+	} else {
+		// fmt.Println("Parsed as YML")
+	}
+	// fmt.Println(2)
+	return ruleConfig.Rules
+
 }
 
 func getScanner(args []string) *bufio.Scanner {
@@ -147,10 +234,10 @@ func ReadConfig() {
 	err := viper.ReadInConfig()
 	if err != nil {
 		if app.GetFlags().ConfigFile != "" {
-			color.Red("[!] '" + app.GetFlags().ConfigFile + "' was not found.")
+			color.Red("[!] Config file '" + app.GetFlags().ConfigFile + "' was not found. Please specify a correct config path with `--config-file`.")
 
 		} else {
-			color.Red("[!] config.yml was not found.")
+			color.Red("[!] config.yml was not found. Please ensure config.yml exists in current working directory or $HOME/.githound/, or use flag `--config [config_path]`.")
 		}
 		os.Exit(1)
 		return

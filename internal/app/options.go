@@ -7,7 +7,6 @@ type Flags struct {
 	DigRepo      bool
 	DigCommits   bool
 	RegexFile    string
-	LanguageFile string
 	ConfigFile   string
 	Pages        int
 	GithubRepo   bool
@@ -21,13 +20,13 @@ type Flags struct {
 	FastMode     bool
 	Threads      int
 	Debug        bool
-	LegacySearch bool
 	NoGists      bool
 	NoRepos      bool
 	ManyResults  bool
 	JsonOutput   bool
+	SearchType   string
 	OTPCode      string
-	TextRegexes  config
+	TextRegexes  []Rule
 }
 
 var flags Flags

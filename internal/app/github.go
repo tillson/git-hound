@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-github/github"
+	"github.com/google/go-github/v57/github"
 	"github.com/pquerna/otp/totp"
 )
 
@@ -28,7 +28,6 @@ type GitHubCredentials struct {
 // SearchOptions are the options that the GitHub search will use.
 type SearchOptions struct {
 	MaxPages int
-	Language string
 	github.SearchOptions
 }
 
@@ -58,15 +57,16 @@ func LoginToGitHub(credentials GitHubCredentials) (httpClient *http.Client, err 
 	// fmt.Println(resp.StatusCode)
 	data, err := ioutil.ReadAll(resp.Body)
 	dataStr := string(data)
+	// fmt.Println(dataStr)
 	if strings.Index(dataStr, "Incorrect username or password.") > -1 {
-		return nil, fmt.Errorf("Incorrect username or password.") 
+		return nil, fmt.Errorf("Incorrect username or password.")
 	}
 	if strings.Index(dataStr, "app_otp") > -1 {
 		csrf, err = GrabCSRFTokenBody(dataStr)
 		if err != nil {
 			return nil, err
 		}
-
+		// fmt.Println(csrf)
 		otp := HandleOTPCode(credentials)
 
 		if strings.Index(resp.Request.URL.String(), "verified-device") > -1 {
@@ -138,14 +138,26 @@ func GrabCSRFTokenBody(pageBody string) (token string, err error) {
 
 // DownloadRawFile downloads files from the githubusercontent CDN.
 func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchResult) (data []byte, err error) {
-	resp, err := client.Get(base + "/" + searchResult.Raw)
-	if err != nil {
-		return nil, err
-	}
-	data, err = ioutil.ReadAll(resp.Body)
-	resp.Body.Close()
-	return data, err
+    // URL encode the path to handle any special characters
+    rawURL := url.PathEscape(searchResult.Raw)
+
+    if strings.Contains(searchResult.Raw, "%") {
+        fmt.Println(searchResult.Raw + " contains % and is problem")
+        return []byte{}, err
+    }
+
+    // Perform the GET request
+    resp, err := client.Get(base + "/" + rawURL)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+
+    // Read the response body
+    data, err = ioutil.ReadAll(resp.Body)
+    return data, err
 }
+
 
 // RepoIsUnpopular uses stars/forks/watchers to determine the popularity of a repo.
 func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
@@ -201,12 +213,7 @@ func ConstructSearchURL(base string, query string, options SearchOptions) string
 	sb.WriteString("&p=" + strconv.Itoa(options.Page))
 	// sb.WriteString("&o=desc")    // + options.Order)
 	sb.WriteString("&s=indexed") // + options.Sort)
-	sb.WriteString("&l=" + options.Language)
-	if GetFlags().LegacySearch {
-		sb.WriteString("&type=codelegacy")
-	} else {
-		sb.WriteString("&type=code")
-	}
+	sb.WriteString("&type=code")
 	return sb.String()
 }
 
