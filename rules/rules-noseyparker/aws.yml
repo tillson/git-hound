@@ -132,181 +132,181 @@ rules:
   - https://docs.developer.amazonservices.com/en_US/dev_guide/index.html
 
 
-- name: AWS S3 Bucket (subdomain style)
-  id: np.s3.1
+# - name: AWS S3 Bucket (subdomain style)
+#   id: np.s3.1
 
-  pattern: |
-    (?x)
-    (?: ^ | [\s/"'] | %2F )
-    (
-    (?: [a-zA-Z0-9_-]+ \. )+   (?# bucket name as subdomain )
-    (?: s3
-      | s3-af-south-1
-      | s3-ap-east-1
-      | s3-ap-northeast-1
-      | s3-ap-northeast-2
-      | s3-ap-northeast-3
-      | s3-ap-south-1
-      | s3-ap-south-2
-      | s3-ap-southeast-1
-      | s3-ap-southeast-2
-      | s3-ap-southeast-3
-      | s3-ap-southeast-4
-      | s3-ca-central-1
-      | s3-eu-central-1
-      | s3-eu-central-2
-      | s3-eu-north-1
-      | s3-eu-south-1
-      | s3-eu-south-2
-      | s3-eu-west-1
-      | s3-eu-west-2
-      | s3-eu-west-3
-      | s3-me-central-1
-      | s3-me-south-1
-      | s3-sa-east-1
-      | s3-us-east-1
-      | s3-us-east-2
-      | s3-us-gov-east-1
-      | s3-us-gov-west-1
-      | s3-us-west-1
-      | s3-us-west-2
-      )
-    \.amazonaws\.com
-    ) \b
+#   pattern: |
+#     (?x)
+#     (?: ^ | [\s/"'] | %2F )
+#     (
+#     (?: [a-zA-Z0-9_-]+ \. )+   (?# bucket name as subdomain )
+#     (?: s3
+#       | s3-af-south-1
+#       | s3-ap-east-1
+#       | s3-ap-northeast-1
+#       | s3-ap-northeast-2
+#       | s3-ap-northeast-3
+#       | s3-ap-south-1
+#       | s3-ap-south-2
+#       | s3-ap-southeast-1
+#       | s3-ap-southeast-2
+#       | s3-ap-southeast-3
+#       | s3-ap-southeast-4
+#       | s3-ca-central-1
+#       | s3-eu-central-1
+#       | s3-eu-central-2
+#       | s3-eu-north-1
+#       | s3-eu-south-1
+#       | s3-eu-south-2
+#       | s3-eu-west-1
+#       | s3-eu-west-2
+#       | s3-eu-west-3
+#       | s3-me-central-1
+#       | s3-me-south-1
+#       | s3-sa-east-1
+#       | s3-us-east-1
+#       | s3-us-east-2
+#       | s3-us-gov-east-1
+#       | s3-us-gov-west-1
+#       | s3-us-west-1
+#       | s3-us-west-2
+#       )
+#     \.amazonaws\.com
+#     ) \b
 
-  references:
-  - https://docs.aws.amazon.com/general/latest/gr/rande.html
+#   references:
+#   - https://docs.aws.amazon.com/general/latest/gr/rande.html
 
-  examples:
-  - 'example-bucket.s3.amazonaws.com'
-  - 'http://bucket.s3-us-east-2.amazonaws.com'
-  - 'http%2F%2Fsome-bucket.s3.amazonaws.com'
+#   examples:
+#   - 'example-bucket.s3.amazonaws.com'
+#   - 'http://bucket.s3-us-east-2.amazonaws.com'
+#   - 'http%2F%2Fsome-bucket.s3.amazonaws.com'
 
-  negative_examples:
-  - '.s3.amazonaws.com'
-  - 's3.amazonaws.com'
-
-
-- name: AWS S3 Bucket (path style)
-  id: np.s3.2
-
-  pattern: |
-    (?x)
-    (?: ^ | [\s/"'] | %2F )
-    (
-    (?: s3
-      | s3-af-south-1
-      | s3-ap-east-1
-      | s3-ap-northeast-1
-      | s3-ap-northeast-2
-      | s3-ap-northeast-3
-      | s3-ap-south-1
-      | s3-ap-south-2
-      | s3-ap-southeast-1
-      | s3-ap-southeast-2
-      | s3-ap-southeast-3
-      | s3-ap-southeast-4
-      | s3-ca-central-1
-      | s3-eu-central-1
-      | s3-eu-central-2
-      | s3-eu-north-1
-      | s3-eu-south-1
-      | s3-eu-south-2
-      | s3-eu-west-1
-      | s3-eu-west-2
-      | s3-eu-west-3
-      | s3-me-central-1
-      | s3-me-south-1
-      | s3-sa-east-1
-      | s3-us-east-1
-      | s3-us-east-2
-      | s3-us-gov-east-1
-      | s3-us-gov-west-1
-      | s3-us-west-1
-      | s3-us-west-2
-      )
-    \.amazonaws\.com
-    /
-    [a-zA-Z0-9_][a-zA-Z0-9_-]* (?: \. [a-zA-Z0-9_-]+)*   (?# bucket name as path )
-    )
-    (?: [^a-zA-Z0-9_-] | $ )                             (?# this instead of a \b anchor because that doesn't play nicely with `-` )
-
-  references:
-  - https://docs.aws.amazon.com/general/latest/gr/rande.html
-
-  examples:
-  - 's3.amazonaws.com/example-bucket'
-  - 'http://s3-us-east-2.amazonaws.com/example-bucket'
-
-  negative_examples:
-  - '.s3.amazonaws.com'
-  - 's3.amazonaws.com'
-  - 's3.amazonaws.com/'
-  - 'some-bucket-name.s3.amazonaws.com/171ea24dd241f8a2178b0374-username-Reponame-3-0'
-  - 'some-bucket.s3.amazonaws.com/some-object-here'
+#   negative_examples:
+#   - '.s3.amazonaws.com'
+#   - 's3.amazonaws.com'
 
 
-- name: Amazon Resource Name
-  id: np.arn.1
+# - name: AWS S3 Bucket (path style)
+#   id: np.s3.2
 
-  pattern: |
-    (?x)
-    \b
-    (
-      arn
-      :
-      (?: aws | aws-cn | aws-us-gov )         (?# partition )
-      :
-      [a-zA-Z0-9_-]{2,}                       (?# service )
-      :
-      (?: af-south-1
-        | ap-east-1
-        | ap-northeast-1
-        | ap-northeast-2
-        | ap-northeast-3
-        | ap-south-1
-        | ap-south-2
-        | ap-southeast-1
-        | ap-southeast-2
-        | ap-southeast-3
-        | ap-southeast-4
-        | ca-central-1
-        | eu-central-1
-        | eu-central-2
-        | eu-north-1
-        | eu-south-1
-        | eu-south-2
-        | eu-west-1
-        | eu-west-2
-        | eu-west-3
-        | me-central-1
-        | me-south-1
-        | sa-east-1
-        | us-east-1
-        | us-east-2
-        | us-gov-east-1
-        | us-gov-west-1
-        | us-west-1
-        | us-west-2
-        )?                                    (?# region )
-      :
-      (?: \d{12} )?                           (?# account ID sans hyphens )
-      :
-      (?: [a-zA-Z0-9_-]+ [:/])?               (?# resource type)
-      [^\s"'&<>\\%]+                          (?# resource ID)
-    )
-    (?: [\s"'&<>\\%] | $ )
+#   pattern: |
+#     (?x)
+#     (?: ^ | [\s/"'] | %2F )
+#     (
+#     (?: s3
+#       | s3-af-south-1
+#       | s3-ap-east-1
+#       | s3-ap-northeast-1
+#       | s3-ap-northeast-2
+#       | s3-ap-northeast-3
+#       | s3-ap-south-1
+#       | s3-ap-south-2
+#       | s3-ap-southeast-1
+#       | s3-ap-southeast-2
+#       | s3-ap-southeast-3
+#       | s3-ap-southeast-4
+#       | s3-ca-central-1
+#       | s3-eu-central-1
+#       | s3-eu-central-2
+#       | s3-eu-north-1
+#       | s3-eu-south-1
+#       | s3-eu-south-2
+#       | s3-eu-west-1
+#       | s3-eu-west-2
+#       | s3-eu-west-3
+#       | s3-me-central-1
+#       | s3-me-south-1
+#       | s3-sa-east-1
+#       | s3-us-east-1
+#       | s3-us-east-2
+#       | s3-us-gov-east-1
+#       | s3-us-gov-west-1
+#       | s3-us-west-1
+#       | s3-us-west-2
+#       )
+#     \.amazonaws\.com
+#     /
+#     [a-zA-Z0-9_][a-zA-Z0-9_-]* (?: \. [a-zA-Z0-9_-]+)*   (?# bucket name as path )
+#     )
+#     (?: [^a-zA-Z0-9_-] | $ )                             (?# this instead of a \b anchor because that doesn't play nicely with `-` )
 
-  references:
-  - https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
+#   references:
+#   - https://docs.aws.amazon.com/general/latest/gr/rande.html
 
-  examples:
-  - 'arn:aws:s3:::my_corporate_bucket/*'
-  - 'arn:aws:s3:::my_corporate_bucket/Development/*'
-  - 'arn:aws:iam::123456789012:user/Development/product_1234/*'
-  - 'alerts: "arn:aws:sns:us-west-2:123456789023:CloudwatchMetricAlarm"'
-  - '"Principal":{"Federated":["arn:aws:iam:::oidc-provider/localhost:8080/auth/realms/quickstart"]},'
-  - '"KeyId": "arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab",'
-  - '"aws-kms://arn:aws:kms:us-east-1:003084325827:key/84a66985-f968-4bac-82c2-365518adf157";'
-  - 'return f"arn:aws:s3:::{bucket_name}"'
-  - 'return f"arn:aws:s3:::${bucket_name}"'
+#   examples:
+#   - 's3.amazonaws.com/example-bucket'
+#   - 'http://s3-us-east-2.amazonaws.com/example-bucket'
+
+#   negative_examples:
+#   - '.s3.amazonaws.com'
+#   - 's3.amazonaws.com'
+#   - 's3.amazonaws.com/'
+#   - 'some-bucket-name.s3.amazonaws.com/171ea24dd241f8a2178b0374-username-Reponame-3-0'
+#   - 'some-bucket.s3.amazonaws.com/some-object-here'
+
+
+# - name: Amazon Resource Name
+#   id: np.arn.1
+
+#   pattern: |
+#     (?x)
+#     \b
+#     (
+#       arn
+#       :
+#       (?: aws | aws-cn | aws-us-gov )         (?# partition )
+#       :
+#       [a-zA-Z0-9_-]{2,}                       (?# service )
+#       :
+#       (?: af-south-1
+#         | ap-east-1
+#         | ap-northeast-1
+#         | ap-northeast-2
+#         | ap-northeast-3
+#         | ap-south-1
+#         | ap-south-2
+#         | ap-southeast-1
+#         | ap-southeast-2
+#         | ap-southeast-3
+#         | ap-southeast-4
+#         | ca-central-1
+#         | eu-central-1
+#         | eu-central-2
+#         | eu-north-1
+#         | eu-south-1
+#         | eu-south-2
+#         | eu-west-1
+#         | eu-west-2
+#         | eu-west-3
+#         | me-central-1
+#         | me-south-1
+#         | sa-east-1
+#         | us-east-1
+#         | us-east-2
+#         | us-gov-east-1
+#         | us-gov-west-1
+#         | us-west-1
+#         | us-west-2
+#         )?                                    (?# region )
+#       :
+#       (?: \d{12} )?                           (?# account ID sans hyphens )
+#       :
+#       (?: [a-zA-Z0-9_-]+ [:/])?               (?# resource type)
+#       [^\s"'&<>\\%]+                          (?# resource ID)
+#     )
+#     (?: [\s"'&<>\\%] | $ )
+
+#   references:
+#   - https://docs.aws.amazon.com/IAM/latest/UserGuide/reference-arns.html
+
+#   examples:
+#   - 'arn:aws:s3:::my_corporate_bucket/*'
+#   - 'arn:aws:s3:::my_corporate_bucket/Development/*'
+#   - 'arn:aws:iam::123456789012:user/Development/product_1234/*'
+#   - 'alerts: "arn:aws:sns:us-west-2:123456789023:CloudwatchMetricAlarm"'
+#   - '"Principal":{"Federated":["arn:aws:iam:::oidc-provider/localhost:8080/auth/realms/quickstart"]},'
+#   - '"KeyId": "arn:aws:kms:us-west-2:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab",'
+#   - '"aws-kms://arn:aws:kms:us-east-1:003084325827:key/84a66985-f968-4bac-82c2-365518adf157";'
+#   - 'return f"arn:aws:s3:::{bucket_name}"'
+#   - 'return f"arn:aws:s3:::${bucket_name}"'
