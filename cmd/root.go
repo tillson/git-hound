@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -26,7 +28,7 @@ import (
 func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SearchType, "search-type", "", "Search interface (`api` or `ui`).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().QueryFile, "query-file", "", "A file containing a list of subdomains (or other queries).")
-	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query stiing (default: stdin)")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query string (default: stdin)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "rules", "rules/rules-noseyparker", "Path to a list of regexes or a GitLeaks rules folder.")
@@ -50,6 +52,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoRepos, "no-repos", false, "Don't search repos")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "debug", false, "Enables verbose debug logging.")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().OTPCode, "otp-code", "", "Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dashboard, "dashboard", false, "Enable dashboard with WebSocket stream.")
 }
 
 var rootCmd = &cobra.Command{
@@ -58,10 +61,17 @@ var rootCmd = &cobra.Command{
 	Long:  `GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a robust scoring system.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		ReadConfig()
+
+		// StartPprofServer()
+
 		size, err := app.DirSize("/tmp/githound")
 		if err == nil && size > 50e+6 {
 			fmt.Println("Cleaning up local repo storage...")
 			app.ClearRepoStorage()
+		}
+
+		if app.GetFlags().Dashboard {
+			app.StartWebSocket(app.GetFlags().WebSocketURL)
 		}
 
 		var queries []string
@@ -85,10 +95,26 @@ var rootCmd = &cobra.Command{
 				}
 			}
 		}
+
 		if len(queries) == 0 {
-			color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
-			os.Exit(1)
-			return
+			if app.GetFlags().Dashboard {
+				color.Red("[!] No search queries specified.")
+				color.Blue("[*] Please enter a query:")
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					query := scanner.Text()
+					if query != "" {
+						queries = append(queries, query)
+						break
+					}
+				}
+				fmt.Println("In the future, you can run this command with the query specified:")
+				fmt.Println("echo \"your_query\" | githound --dashboard")
+			} else {
+				color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
+				os.Exit(1)
+				return
+			}
 		}
 
 		var allRules []app.Rule
@@ -235,11 +261,20 @@ func ReadConfig() {
 	if err != nil {
 		if app.GetFlags().ConfigFile != "" {
 			color.Red("[!] Config file '" + app.GetFlags().ConfigFile + "' was not found. Please specify a correct config path with `--config-file`.")
-
 		} else {
 			color.Red("[!] config.yml was not found. Please ensure config.yml exists in current working directory or $HOME/.githound/, or use flag `--config [config_path]`.")
 		}
 		os.Exit(1)
 		return
 	}
+
+	// Read WebSocket URL from config
+	app.GetFlags().WebSocketURL = viper.GetString("websocket_url")
+}
+
+// StartPprofServer starts the pprof server
+func StartPprofServer() {
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 }

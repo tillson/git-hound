@@ -1,23 +1,23 @@
 rules:
 
-- name: Shopify Domain
-  id: np.shopify.1
-  catgegories: [identifier]
+# - name: Shopify Domain
+#   id: np.shopify.1
+#   catgegories: [identifier]
 
-  pattern: |
-    (?x)
-    \b
-    (
-      (?:[a-zA-Z0-9-]+\.)* [a-zA-Z0-9-]+ \.myshopify\.com
-    )
-    \b
+#   pattern: |
+#     (?x)
+#     \b
+#     (
+#       (?:[a-zA-Z0-9-]+\.)* [a-zA-Z0-9-]+ \.myshopify\.com
+#     )
+#     \b
 
-  references:
-  - https://help.shopify.com/en/manual/domains
+#   references:
+#   - https://help.shopify.com/en/manual/domains
 
-  examples:
-  - 'handsomestranger.myshopify.com' 
-  - 'store.handsomestranger.myshopify.com' 
+#   examples:
+#   - 'handsomestranger.myshopify.com' 
+#   - 'store.handsomestranger.myshopify.com' 
 
 
 - name: Shopify App Secret

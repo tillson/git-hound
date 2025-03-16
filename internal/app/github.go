@@ -138,26 +138,25 @@ func GrabCSRFTokenBody(pageBody string) (token string, err error) {
 
 // DownloadRawFile downloads files from the githubusercontent CDN.
 func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchResult) (data []byte, err error) {
-    // URL encode the path to handle any special characters
-    rawURL := url.PathEscape(searchResult.Raw)
+	// URL encode the path to handle any special characters
+	rawURL := url.PathEscape(searchResult.Raw)
 
-    if strings.Contains(searchResult.Raw, "%") {
-        fmt.Println(searchResult.Raw + " contains % and is problem")
-        return []byte{}, err
-    }
+	if strings.Contains(searchResult.Raw, "%") {
+		// fmt.Println(searchResult.Raw + " contains % and is problem")
+		return []byte{}, err
+	}
 
-    // Perform the GET request
-    resp, err := client.Get(base + "/" + rawURL)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
+	// Perform the GET request
+	resp, err := client.Get(base + "/" + rawURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-    // Read the response body
-    data, err = ioutil.ReadAll(resp.Body)
-    return data, err
+	// Read the response body
+	data, err = ioutil.ReadAll(resp.Body)
+	return data, err
 }
-
 
 // RepoIsUnpopular uses stars/forks/watchers to determine the popularity of a repo.
 func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
@@ -169,8 +168,10 @@ func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	resp.Body.Close()
 	strData := string(data)
+	// fmt.Println(strData)
 	regex := regexp.MustCompile("aria\\-label\\=\"(\\d+)\\suser(s?)\\sstarred\\sthis")
 	match := regex.FindStringSubmatch(strData)
 	if len(match) > 1 {

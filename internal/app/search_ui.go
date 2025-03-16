@@ -63,16 +63,16 @@ func SearchWithUI(queries []string) {
 		color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
 	}
 	for _, query := range queries {
+		if GetFlags().Dashboard && InsertKey != "" {
+			BrokerSearchCreation(query)
+		}
 		_, err = Search(query, client)
 		if err != nil {
 			color.Red("[!] Unable to collect search results for query '" + query + "'.")
 			break
 		}
 	}
-	// size, err := app.DirSize("/tmp/githound")
-	// if err == nil && size > 50e+6 {
-	// 	app.ClearRepoStorage()
-	// }
+
 	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 		color.Green("Finished searching... Now waiting for scanning to finish.")
 	}
@@ -81,7 +81,6 @@ func SearchWithUI(queries []string) {
 	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 		color.Green("Finished scanning.")
 	}
-
 }
 
 // Search Everything

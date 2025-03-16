@@ -1,15 +1,16 @@
 # Instructions: rename this file to config.yml. 
 # DO NOT CHECK YOUR USERNAME AND PASSWORD INTO GIT!
 
-# Required
-# Use with `--search-type api` flag
+# GitHub Access Token
+# Instructions: Create a GitHub access token at https://github.com/settings/personal-access-tokens.
 github_access_token: "API_TOKEN"
 
-# Use with `--search-type ui` flag
-#github_username: "username"
-#github_password: "your_password"
+
+# WebSocket URL for GitHound Explore (--dashboard)
+websocket_url: "wss://beta.githoundexplore.com/ws"
 
 
-
-# Optional (comment out if not using)
+# Deprecated UI search (Use with `--search-type ui` flag)
+# github_username: "username"
+# github_password: "your_password"
 # github_totp_seed: "ABCDEF1234567890" # Obtained via https://github.com/settings/security

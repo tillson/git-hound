@@ -57,12 +57,12 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 				SingleBranch: true,
 				Depth:        20,
 			})
-			if err != nil {
-				if GetFlags().Debug {
-					fmt.Println(err)
-				}
-				return
-			}
+			// if err != nil {
+			// 	if GetFlags().Debug {
+			// 		fmt.Println(err)
+			// 	}
+			// 	return
+			// }
 
 			if err != nil {
 				if GetFlags().Debug {

@@ -24,9 +24,11 @@ type Flags struct {
 	NoRepos      bool
 	ManyResults  bool
 	JsonOutput   bool
+	Dashboard    bool
 	SearchType   string
 	OTPCode      string
 	TextRegexes  []Rule
+	WebSocketURL string
 }
 
 var flags Flags
