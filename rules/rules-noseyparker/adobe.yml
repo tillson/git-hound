@@ -3,11 +3,8 @@ rules:
 - name: Adobe OAuth Client Secret
   id: np.adobe.1
 
-  pattern: |
-    (?x)(?i)
-    \b
-    (p8e-[a-z0-9-]{32})
-    (?:[^a-z0-9-]|$)
+  pattern: (?i:\b(p8e-[a-z0-9-]{32})(?:[^a-z0-9-]|$))
+
 
   references:
   - https://developer.adobe.com/developer-console/docs/guides/authentication/

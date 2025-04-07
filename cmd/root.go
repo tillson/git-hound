@@ -137,11 +137,11 @@ var rootCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			for _, file := range files {
-				// if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yml" {
-				filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
-				rules := LoadRegexFile(filePath)
-				allRules = append(allRules, rules...)
-				// }
+				if filepath.Ext(file.Name()) == ".yml" || filepath.Ext(file.Name()) == ".yml" {
+					filePath := filepath.Join(app.GetFlags().RegexFile, file.Name())
+					rules := LoadRegexFile(filePath)
+					allRules = append(allRules, rules...)
+				}
 			}
 			app.GetFlags().TextRegexes = append(app.GetFlags().TextRegexes, allRules...)
 		} else {
@@ -187,6 +187,28 @@ func LoadRegexFile(path string) []app.Rule {
 	}
 	defer file.Close()
 
+	// Check file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	isYamlFile := ext == ".yml" || ext == ".yaml"
+
+	// For YAML files, only try YAML parsing
+	if isYamlFile {
+		dec := yaml.NewDecoder(file)
+		ruleConfig := app.RuleConfig{}
+		err = dec.Decode(&ruleConfig)
+		if err != nil {
+			color.Yellow("[!] Error parsing YAML file %v: %v", path, err)
+			return nil
+		}
+
+		if len(ruleConfig.Rules) > 0 {
+			color.Green("[+] Loaded %d regex rules from %s", len(ruleConfig.Rules), path)
+		}
+
+		return ruleConfig.Rules
+	}
+
+	// For non-YAML files, try YAML first, then TOML, then line-by-line
 	dec := yaml.NewDecoder(file)
 	ruleConfig := app.RuleConfig{}
 	err = dec.Decode(&ruleConfig)

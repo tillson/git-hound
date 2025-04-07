@@ -11,13 +11,8 @@ rules:
   #   - ApplicationToken
   #
   # Maybe we can generalize this rule one day.
-  pattern: |
-    (?x)
-    (?i)
-    (?: AccountName | SharedAccessKeyName | SharedSecretIssuer) \s*=\s* ([^;]{1,80}) \s*;\s*
-    .{0,10}\s*  (?# possible extra stuff, e.g., string concatenation)
-    (?: AccountKey | SharedAccessKey | SharedSecretValue) \s*=\s* ([^;]{1,100})
-    (?: ;|$ )
+  pattern: (?i:(?:AccountName|SharedAccessKeyName|SharedSecretIssuer)\s*=\s*([^;]{1,80})\s*;\s*.{0,10}\s*(?:AccountKey|Shared*
+
 
   references:
   - https://azure.microsoft.com/en-us/blog/windows-azure-web-sites-how-application-strings-and-connection-strings-work/

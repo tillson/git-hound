@@ -27,12 +27,8 @@ rules:
 - name: Google OAuth Client Secret
   id: np.google.3
 
-  pattern: |
-    (?x)(?i)
-    client.?secret .{0,10}
-    \b
-    ([a-z0-9_-]{24})
-    (?: [^a-z0-9_-] |$)
+  pattern: (?i:client.?secret.{0,10}\b([a-z0-9_-]{24})(?:[^a-z0-9_-]|$))
+
 
   examples:
   - '"client_secret":"aaaaaaaaaaaaaaaaaaaaaaa-"'

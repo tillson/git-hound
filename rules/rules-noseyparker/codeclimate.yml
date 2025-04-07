@@ -9,11 +9,8 @@ rules:
 - name: CodeClimate Reporter ID
   id: np.codeclimate.1
 
-  pattern: |
-    (?x)
-    (?: CODECLIMATE_REPO_TOKEN | CC_TEST_REPORTER_ID)
-    \s* [:=] \s*
-    ([a-f0-9]{64})\b
+  pattern: (?:CODECLIMATE_REPO_TOKEN|CC_TEST_REPORTER_ID)\s*[:=]\s*([a-f0-9]{64})\b
+
 
   references:
   # Old reporters use `CODECLIMATE_REPO_TOKEN`

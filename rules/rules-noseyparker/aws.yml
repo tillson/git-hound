@@ -26,17 +26,7 @@ rules:
 - name: AWS Secret Access Key
   id: np.aws.2
 
-  pattern: |
-    (?x)(?i)
-    \b
-    aws_? (?:secret)? _? (?:access)? _? (?:key)?
-    ["'']?
-    \s{0,30}
-    (?::|=>|=)
-    \s{0,30}
-    ["'']?
-    ([a-z0-9/+=]{40})
-    \b
+  pattern: "(?i)\\baws_?(?:secret)?_?(?:access)?_?(?:key)?[\"'']?\\s{0,30}(?::|=>|=)\\s{0,30}[\"'']?([a-z0-9/+=]{40})\\b"
 
   references:
   - https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html

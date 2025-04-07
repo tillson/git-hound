@@ -3,15 +3,8 @@ rules:
 - name: Facebook Secret Key
   id: np.facebook.1
 
-  pattern: |
-    (?x)(?i)
-    \b (?: facebook | fb )
-    .?
-    (?: api | app | application | client | consumer | customer | secret | key )
-    .?
-    (?: key | oauth | sec | secret )?
-    .{0,2} \s{0,20} .{0,2} \s{0,20} .{0,2}  (?# string terminators, whitespace, binding operators, etc )
-    \b ([a-z0-9]{32}) \b
+  pattern: (?i:\b(?:facebook|fb).?(?:api|app|application|client|consumer|customer|secret|key).?(?:key|oauth|sec|secret)?.{0,2}\s{0,20}.{0,2}\s{0,20}.{0,2}\b([a-z0-9]{32})\b)
+
 
   references:
   - https://developers.facebook.com/docs/facebook-login/access-tokens/

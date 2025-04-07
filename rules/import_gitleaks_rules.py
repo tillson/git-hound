@@ -1,4 +1,6 @@
 # Import GitLeaks (https://github.com/zricethezav/gitleaks) regex rules into the GitHub rules file
+# Note that many of the rules require post-processing to work correctly with GitHound. This is already done in the included version.
+
 import requests
 import sys
 import datetime

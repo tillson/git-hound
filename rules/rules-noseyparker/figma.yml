@@ -4,19 +4,7 @@ rules:
   id: np.figma.1
 
   # The key material looks like a v4 UUID with an extra 4 hex digits up front
-  pattern: |
-    (?x)(?i)
-    figma.{0,20}
-    \b
-    (
-      [0-9a-f]{4}-
-      [0-9a-f]{8}-
-      [0-9a-f]{4}-
-      [0-9a-f]{4}-
-      [0-9a-f]{4}-
-      [0-9a-f]{12}
-    )
-    \b
+  pattern: "(?i)figma.{0,20}\\b([0-9a-f]{4}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\\b"
 
   references:
   - https://www.figma.com/developers/api

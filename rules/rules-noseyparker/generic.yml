@@ -11,13 +11,8 @@ rules:
 - name: Generic Secret
   id: np.generic.1
 
-  pattern: |
-    (?x)(?i)
-    secret
-    .{0,20}
-    \b
-    ([0-9a-z]{32,64})
-    \b
+  pattern: (?i:secret.{0,20}\b([0-9a-z]{32,64})\b)
+
 
   examples:
   - '    private static String CLIENT_SECRET = "6fb1cff7690db9ac066cadbbde8e3c078efdabcf";'
@@ -32,15 +27,8 @@ rules:
 - name: Generic API Key
   id: np.generic.2
 
-  pattern: |
-    (?x)(?i)
-    (?: api_key | apikey | access_key | accesskey )
-    .{0,3}
-    [\ \t]* (?: : | = | := | => | , | ' | " ) [\ \t]*
-    .{0,3}
-    \b
-    ([0-9a-z][0-9a-z\-._/+]{30,62}[0-9a-z])
-    \b
+  pattern: (?i:(?:api_key|apikey|access_key|accesskey).{0,3}[\ \t]*(?:=|:=|=>|:|,|'|")[\ \t]*.{0,3}\b([0-9a-z][0-9a-z\-._/+]{30,62}[0-9a-z])\b)
+
 
   examples:
   - 'API_KEY = "951bc382db9abad29c68634761dd6e19"'
@@ -53,16 +41,8 @@ rules:
 - name: Generic Username and Password (quoted)
   id: np.generic.3
 
-  pattern: |
-    (?x)
-    (?: username | USERNAME | user | USER)       (?# username context keyword )
-    [\ \t]* = [\ \t]*                            (?# assignment / binder, sans newline )
-    ["'] ([a-zA-Z0-9.@_\-+]{3,30}) ["']          (?# quoted username )
-    \s* [,;]? \s*                                (?# optional assignment separator )
-    (?: \s* (?: \# | //) [^\n\r]*[\n\r])*        (?# optional line comments )
-    (?: password | pass | PASSWORD | PASS)       (?# password context keyword )
-    [\ \t]* = [\ \t]*                            (?# assignment / binder, sans newline )
-    ["'] ([^"']{5,30}) ["']                      (?# quoted password )
+  pattern: (?:username|USERNAME|user|USER)[\ \t]*=[\ \t]*["']([a-zA-Z0-9.@_\-+]{3,30})["']\s*[,;]?\s*(?:\s*(?:\#|//)[^\n\r]*[\n\r])*?(?:password|pass|PASSWORD|PASS)[\ \t]*=[\ \t]*["']([^"']{5,30})["']
+
 
   examples:
   - |
@@ -112,17 +92,7 @@ rules:
 
 - name: Generic Username and Password (unquoted)
   id: np.generic.4
-  pattern: |
-    (?x)
-    (?: username | USERNAME | user | USER)       (?# username context keyword )
-    [\ \t]* = [\ \t]*                            (?# assignment / binder, sans newline )
-    ([a-zA-Z0-9.@_\-+]{3,30})                    (?# unquoted username )
-    \s* ;? \s*                                   (?# optional assignment separator )
-    (?: \s* (?: \# | //) [^\n\r]*[\n\r])*        (?# optional line comments )
-    (?: password | pass | PASSWORD | PASS)       (?# password context keyword )
-    [\ \t]* = [\ \t]*                            (?# assignment / binder, sans newline )
-    (\S{5,30})                                   (?# unquoted password )
-    (?: \s | $ )                                 (?# end-of-password anchor )
+  pattern: (?:username|USERNAME|user|USER)[\ \t]*=[\ \t]*([a-zA-Z0-9.@_\-+]{3,30})\s*;?\s*(?:\s*(?:\#|//)[^\n\r]*[\n\r])*?(?:password|pass|PASSWORD|PASS)[\ \t]*=[\ \t]*(\S{5,30})(?:\s|$)
 
   examples:
   - |
@@ -146,13 +116,8 @@ rules:
 - name: Generic Password (double quoted)
   id: np.generic.5
 
-  pattern: |
-    (?x)(?i)
-    password["']?                                (?# preceding context )
-    [\ \t]* (?: = | : | := | => ) [\ \t]*        (?# binder )
-    "
-    ([^$<%@.,\s+'"(){}&/\#\-][^\s+'"(){}/]{4,})  (?# password )
-    "
+  pattern: (?i:password["']?[\ \t]*(?:=|:|:=|=>)[\ \t]*"([^$<%@.,\s+'"(){}&/\#\-][^\s+'"(){}/]{4,})")
+
 
   examples:
   - |
@@ -223,13 +188,8 @@ rules:
 - name: Generic Password (single quoted)
   id: np.generic.6
 
-  pattern: |
-    (?x)(?i)
-    password["']?                                (?# preceding context )
-    [\ \t]* (?: = | : | := | => ) [\ \t]*        (?# binder )
-    '
-    ([^$<%@.,\s+'"(){}&/\#\-][^\s+'"(){}/]{4,})  (?# password )
-    '
+  pattern: (?i:password["']?[\ \t]*(?:=|:|:=|=>)[\ \t]*'([^$<%@.,\s+'"(){}&/\#\-][^\s+'"(){}/]{4,})')
+
 
   examples:
   - |

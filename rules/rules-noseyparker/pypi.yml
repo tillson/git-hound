@@ -4,11 +4,7 @@ rules:
   id: np.pypi.1
 
   # NOTE: these can actually be arbitrarily long
-  pattern: |
-    (?x)
-    \b
-    (pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_-]{50,})
-    (?:[^a-zA-Z0-9_-]|$)
+  pattern: \b(pypi-AgEIcHlwaS5vcmc[a-zA-Z0-9_-]{50,})(?:[^a-zA-Z0-9_-]|$)
 
   references:
   # GitHub Secrets Scanning implementation issue and discussion

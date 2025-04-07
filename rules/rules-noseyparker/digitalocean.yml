@@ -3,11 +3,8 @@ rules:
 - name: DigitalOcean Application Access Token
   id: np.digitalocean.1
 
-  pattern: |
-    (?x)(?i)
-    \b
-    (doo_v1_[a-f0-9]{64})
-    \b
+  pattern: (?i:\b(doo_v1_[a-f0-9]{64})\b)
+
 
   references:
   - https://docs.digitalocean.com/reference/api/
