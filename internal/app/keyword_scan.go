@@ -171,26 +171,14 @@ func MatchKeywords(source string) (matches []Match) {
 
 	// Loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes {
-		// Use the compiled regexp directly, check if it's a RegexWrapper or *regexp.Regexp
-		var matchIndices [][]int
-		var expressionStr string
-
-		if regex.Pattern != nil {
-			// Using standard Go regexp
-			matchIndices = regex.Pattern.FindAllIndex([]byte(source), -1)
-			expressionStr = regex.Pattern.String()
-		} else if regex.PCREPattern != nil {
-			// Using PCRE regexp
-			matches := regex.PCREPattern.RegExp.FindAllIndex([]byte(source), 0)
-			matchIndices = make([][]int, len(matches))
-			for i, match := range matches {
-				matchIndices[i] = []int{match[0], match[1]}
-			}
-			expressionStr = regex.StringPattern
-		} else {
-			// No pattern available
+		// Skip if no pattern available
+		if regex.Pattern == nil {
 			continue
 		}
+
+		// Find all matches in the source
+		matchIndices := regex.Pattern.FindAllIndex([]byte(source), -1)
+		expressionStr := regex.Pattern.String()
 
 		for _, matchIndex := range matchIndices {
 			matchText := source[matchIndex[0]:matchIndex[1]]

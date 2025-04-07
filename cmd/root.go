@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 
-	"github.com/GRbit/go-pcre"
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh/terminal"
@@ -201,11 +201,11 @@ func LoadRegexFile(path string) []app.Rule {
 					continue
 				}
 
-				// Try to compile with PCRE
-				compiled, err := pcre.Compile(line, 0)
+				// Try to compile with Go's regexp
+				compiled, err := regexp.Compile(line)
 				if err != nil {
 					if skippedCount < 5 {
-						color.Yellow("[!] Skipping invalid regex: %s", line)
+						color.Yellow("[!] Skipping invalid regex: %s - %v", line, err)
 					} else if skippedCount == 5 {
 						color.Yellow("[!] Skipping additional invalid regexes...")
 					}
@@ -216,7 +216,7 @@ func LoadRegexFile(path string) []app.Rule {
 				// Create a new rule
 				rule := app.Rule{
 					ID:             fmt.Sprintf("Rule-%d", idCount), // Incremental ID
-					PCREPattern:    &app.RegexWrapper{RegExp: compiled},
+					Pattern:        compiled,
 					StringPattern:  line,                                            // Store the original pattern as StringPattern
 					Description:    fmt.Sprintf("Description for Rule-%d", idCount), // Incremental description
 					SmartFiltering: false,                                           // Default to false, you can modify if needed
@@ -235,12 +235,12 @@ func LoadRegexFile(path string) []app.Rule {
 			// Convert StringPattern to Pattern for TOML
 			for i, rule := range ruleConfig.Rules {
 				if rule.StringPattern != "" {
-					compiled, err := pcre.Compile(rule.StringPattern, 0)
+					compiled, err := regexp.Compile(rule.StringPattern)
 					if err != nil {
-						color.Yellow("[!] Unable to parse regex '%s' in TOML file", rule.StringPattern)
+						color.Yellow("[!] Unable to parse regex '%s' in TOML file: %v", rule.StringPattern, err)
 						continue
 					}
-					ruleConfig.Rules[i].PCREPattern = &app.RegexWrapper{RegExp: compiled}
+					ruleConfig.Rules[i].Pattern = compiled
 				}
 			}
 		}

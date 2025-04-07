@@ -4,22 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"github.com/GRbit/go-pcre"
 )
-
-// RegexWrapper wraps PCRE regex objects for compatibility
-type RegexWrapper struct {
-	RegExp pcre.Regexp
-}
-
-// String returns the string representation of the regex pattern
-func (rw *RegexWrapper) String() string {
-	if rw == nil {
-		return "<nil>"
-	}
-	return "pcre-regex" // PCRE doesn't have a String() method, return a placeholder
-}
 
 type RuleConfig struct {
 	Rules []Rule `yaml:"rules,omitempty"`
@@ -28,7 +13,6 @@ type RuleConfig struct {
 type Rule struct {
 	ID             string         `yaml:"id" toml:"id"`
 	Pattern        *regexp.Regexp `yaml:"pattern"`
-	PCREPattern    *RegexWrapper  `yaml:"-"` // For PCRE regexp support
 	StringPattern  string         `toml:"regex"`
 	Description    string         `yaml:"name" toml:"description"`
 	SmartFiltering bool           `yaml:"smart_filtering" toml:"smart_filtering"`
@@ -57,22 +41,12 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return nil
 	}
 
-	// Try to compile with Go's regexp package
+	// Compile with Go's regexp package
 	compiled, err := regexp.Compile(temp.Pattern)
 	if err != nil {
-		// If standard Go regexp fails, try PCRE
-		pcrePattern, pcreErr := pcre.Compile(temp.Pattern, 0)
-		if pcreErr != nil {
-			return fmt.Errorf("failed to compile regex '%s' with both Go regexp and PCRE: %w", temp.Pattern, err)
-		}
-
-		// Use PCRE if successful
-		r.PCREPattern = &RegexWrapper{RegExp: pcrePattern}
-		r.StringPattern = temp.Pattern
-		return nil
+		return fmt.Errorf("failed to compile regex '%s': %w", temp.Pattern, err)
 	}
 
-	// Use Go regexp if successful
 	r.Pattern = compiled
 	r.StringPattern = temp.Pattern
 	return nil
