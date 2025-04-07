@@ -52,7 +52,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoRepos, "no-repos", false, "Don't search repos")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "debug", false, "Enables verbose debug logging.")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().OTPCode, "otp-code", "", "Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)")
-	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dashboard, "dashboard", false, "Enable dashboard with WebSocket stream.")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dashboard, "dashboard", false, "Stream results to GitHoundExplore.com")
 }
 
 var rootCmd = &cobra.Command{
@@ -168,7 +168,8 @@ var rootCmd = &cobra.Command{
 func LoadRegexFile(path string) []app.Rule {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0600)
 	if err != nil {
-		color.Yellow("[!} Error opening rules file %v: %v", app.GetFlags().RegexFile+"", err)
+		color.Yellow("[!] Error opening rules file %v: %v", app.GetFlags().RegexFile+"", err)
+		return nil
 	}
 	defer file.Close()
 
@@ -179,26 +180,43 @@ func LoadRegexFile(path string) []app.Rule {
 		_, err := toml.DecodeFile(path, &ruleConfig)
 
 		if err != nil {
-			// fmt.Println("Resorting to .txt")
-			file, _ := os.Open(path)
+			// Try to parse as a text file with one regex per line
+			file, err := os.Open(path)
+			if err != nil {
+				color.Yellow("[!] Error reopening file %v: %v", path, err)
+				return nil
+			}
 			defer file.Close()
+
 			scanner := bufio.NewScanner(file)
 			idCount := 1
+			skippedCount := 0
 
 			for scanner.Scan() {
-				line := scanner.Text()
-				// fmt.Println(line)
-				// Assuming each line is a regex pattern, we create a Rule from it
+				line := strings.TrimSpace(scanner.Text())
+
+				// Skip empty lines, comments, or lines that are obviously not regexes
+				if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "-") ||
+					strings.HasPrefix(line, " -") || strings.Contains(line, "++++++") {
+					continue
+				}
+
+				// Try to compile with PCRE
 				compiled, err := pcre.Compile(line, 0)
 				if err != nil {
-					fmt.Printf("Unable to parse regex `%s` in TXT file.\n", line)
+					if skippedCount < 5 {
+						color.Yellow("[!] Skipping invalid regex: %s", line)
+					} else if skippedCount == 5 {
+						color.Yellow("[!] Skipping additional invalid regexes...")
+					}
+					skippedCount++
 					continue
 				}
 
 				// Create a new rule
 				rule := app.Rule{
 					ID:             fmt.Sprintf("Rule-%d", idCount), // Incremental ID
-					Pattern:        app.RegexWrapper{RegExp: compiled},
+					PCREPattern:    &app.RegexWrapper{RegExp: compiled},
 					StringPattern:  line,                                            // Store the original pattern as StringPattern
 					Description:    fmt.Sprintf("Description for Rule-%d", idCount), // Incremental description
 					SmartFiltering: false,                                           // Default to false, you can modify if needed
@@ -209,26 +227,31 @@ func LoadRegexFile(path string) []app.Rule {
 
 				idCount++ // Increment the rule ID counter
 			}
+
+			if skippedCount > 0 {
+				color.Yellow("[!] Skipped %d invalid regex patterns", skippedCount)
+			}
 		} else {
 			// Convert StringPattern to Pattern for TOML
 			for i, rule := range ruleConfig.Rules {
 				if rule.StringPattern != "" {
 					compiled, err := pcre.Compile(rule.StringPattern, 0)
 					if err != nil {
-						// fmt.Println("Unable to parse regex `" + rule.StringPattern + "` in TOML file.")
+						color.Yellow("[!] Unable to parse regex '%s' in TOML file", rule.StringPattern)
+						continue
 					}
-					ruleConfig.Rules[i].Pattern = app.RegexWrapper{RegExp: compiled}
-
+					ruleConfig.Rules[i].PCREPattern = &app.RegexWrapper{RegExp: compiled}
 				}
 			}
-			// fmt.Println("Parsed as TOML")
 		}
-	} else {
-		// fmt.Println("Parsed as YML")
 	}
-	// fmt.Println(2)
-	return ruleConfig.Rules
 
+	// Debug info about loaded rules
+	if len(ruleConfig.Rules) > 0 {
+		color.Green("[+] Loaded %d regex rules from %s", len(ruleConfig.Rules), path)
+	}
+
+	return ruleConfig.Rules
 }
 
 func getScanner(args []string) *bufio.Scanner {

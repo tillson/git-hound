@@ -168,29 +168,47 @@ func MatchKeywords(source string) (matches []Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
-	// fmt.Println(len(source))
+
 	// Loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes {
-		pcreRegex := regex.Pattern.RegExp
+		// Use the compiled regexp directly, check if it's a RegexWrapper or *regexp.Regexp
+		var matchIndices [][]int
+		var expressionStr string
 
-		var matchStrings []string
-		matched := pcreRegex.FindAllIndex([]byte(source), 0)
-		for _, match := range matched {
-			matchStrings = append(matchStrings, source[match[0]:match[1]])
+		if regex.Pattern != nil {
+			// Using standard Go regexp
+			matchIndices = regex.Pattern.FindAllIndex([]byte(source), -1)
+			expressionStr = regex.Pattern.String()
+		} else if regex.PCREPattern != nil {
+			// Using PCRE regexp
+			matches := regex.PCREPattern.RegExp.FindAllIndex([]byte(source), 0)
+			matchIndices = make([][]int, len(matches))
+			for i, match := range matches {
+				matchIndices[i] = []int{match[0], match[1]}
+			}
+			expressionStr = regex.StringPattern
+		} else {
+			// No pattern available
+			continue
 		}
-		for _, match := range matchStrings {
+
+		for _, matchIndex := range matchIndices {
+			matchText := source[matchIndex[0]:matchIndex[1]]
+
 			shouldMatch := !regex.SmartFiltering
 			if regex.SmartFiltering {
-				if Entropy(match) > 3.5 {
-					shouldMatch = !(containsSequence(match) || containsCommonWord(match))
+				if Entropy(matchText) > 3.5 {
+					shouldMatch = !(containsSequence(matchText) || containsCommonWord(matchText))
 				}
 			}
+
 			if shouldMatch {
+				line := GetLine(source, matchText)
 				matches = append(matches, Match{
 					Attributes: []string{regex.ID, regex.Description},
-					Text:       match,
-					Expression: "", // Or a method to get the string representation of the pattern
-					Line:       GetLine(source, match),
+					Text:       matchText,
+					Expression: expressionStr,
+					Line:       line,
 				})
 			}
 		}
@@ -206,17 +224,22 @@ func MatchCustomRegex(source string) (matches []Match) {
 	}
 
 	for _, regex := range customRegexes {
-		regMatches := regex.FindAllString(source, -1)
-		for _, regMatch := range regMatches {
+		// Find all match indices instead of just strings
+		matchIndices := regex.FindAllIndex([]byte(source), -1)
+
+		for _, matchIndex := range matchIndices {
+			matchText := source[matchIndex[0]:matchIndex[1]]
+			line := GetLine(source, matchText)
+
 			matches = append(matches, Match{
 				Attributes: []string{"regex"},
-				Text:       regMatch,
+				Text:       matchText,
 				Expression: regex.String(),
-				Line:       GetLine(source, regMatch),
+				Line:       line,
 			})
 		}
-
 	}
+
 	return matches
 }
 
@@ -225,20 +248,25 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 	if GetFlags().NoFiles || source == "" {
 		return matches
 	}
+
 	regexString := "(?i)(vim_settings\\.xml)(\\.(zip|env|docx|xlsx|pptx|pdf))$"
 	regex := regexp.MustCompile(regexString)
-	// fmt.Println(source)
-	matchStrings := regex.FindAllStringSubmatch(source, -1)
-	for _, match := range matchStrings {
-		if len(match) > 0 {
-			matches = append(matches, Match{
-				Attributes: []string{"interesting_filename"},
-				Text:       string(match[0]),
-				Expression: regex.String(),
-				Line:       GetLine(source, match[0]),
-			})
-		}
+
+	// Find all match indices instead of using FindAllStringSubmatch
+	matchIndices := regex.FindAllIndex([]byte(source), -1)
+
+	for _, matchIndex := range matchIndices {
+		matchText := source[matchIndex[0]:matchIndex[1]]
+		line := GetLine(source, matchText)
+
+		matches = append(matches, Match{
+			Attributes: []string{"interesting_filename"},
+			Text:       matchText,
+			Expression: regex.String(),
+			Line:       line,
+		})
 	}
+
 	return matches
 }
 
