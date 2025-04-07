@@ -51,8 +51,11 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoGists, "no-gists", false, "Don't search Gists")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().NoRepos, "no-repos", false, "Don't search repos")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Debug, "debug", false, "Enables verbose debug logging.")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().APIDebug, "api-debug", false, "Prints details about GitHub API requests and counts them.")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().OTPCode, "otp-code", "", "Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dashboard, "dashboard", false, "Stream results to GitHoundExplore.com")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().EnableProfiling, "profile", false, "Enable pprof profiling on localhost:6060")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ProfileAddr, "profile-addr", "localhost:6060", "Address to serve pprof profiles")
 }
 
 var rootCmd = &cobra.Command{
@@ -62,7 +65,14 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		ReadConfig()
 
-		// StartPprofServer()
+		// Start pprof server if profiling is enabled
+		if app.GetFlags().EnableProfiling {
+			StartPprofServer()
+			color.Cyan("[*] pprof profiling server started at %s", app.GetFlags().ProfileAddr)
+			color.Cyan("[*] Visit http://%s/debug/pprof/ in your browser", app.GetFlags().ProfileAddr)
+			color.Cyan("[*] Run 'go tool pprof http://%s/debug/pprof/profile' for CPU profiling", app.GetFlags().ProfileAddr)
+			color.Cyan("[*] Run 'go tool pprof http://%s/debug/pprof/heap' for memory profiling", app.GetFlags().ProfileAddr)
+		}
 
 		size, err := app.DirSize("/tmp/githound")
 		if err == nil && size > 50e+6 {
@@ -162,6 +172,10 @@ var rootCmd = &cobra.Command{
 			app.SearchWithAPI(queries)
 		}
 
+		// Print API request summary if enabled
+		if app.GetFlags().APIDebug {
+			app.PrintAPIRequestSummary()
+		}
 	},
 }
 
@@ -295,9 +309,9 @@ func ReadConfig() {
 	app.GetFlags().WebSocketURL = viper.GetString("websocket_url")
 }
 
-// StartPprofServer starts the pprof server
+// StartPprofServer starts the pprof HTTP server for profiling
 func StartPprofServer() {
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		log.Println(http.ListenAndServe(app.GetFlags().ProfileAddr, nil))
 	}()
 }

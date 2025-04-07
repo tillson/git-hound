@@ -2,7 +2,9 @@ package app
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/v57/github"
@@ -138,56 +141,110 @@ func GrabCSRFTokenBody(pageBody string) (token string, err error) {
 
 // DownloadRawFile downloads files from the githubusercontent CDN.
 func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchResult) (data []byte, err error) {
-	// URL encode the path to handle any special characters
-	rawURL := url.PathEscape(searchResult.Raw)
-
+	// If the raw URL contains '%' character, gracefully skip it
 	if strings.Contains(searchResult.Raw, "%") {
-		// fmt.Println(searchResult.Raw + " contains % and is problem")
-		return []byte{}, err
+		// Return empty byte array with nil error to gracefully skip this file
+		return []byte{}, nil
 	}
 
+	// Create a context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	// Construct the full URL
+	fullURL := base + "/" + searchResult.Raw
+
+	// Create a request with the timeout context
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	TrackAPIRequest("GitHub Web", fmt.Sprintf("GET %s (download raw file)", fullURL))
+
 	// Perform the GET request
-	resp, err := client.Get(base + "/" + rawURL)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// Read the response body
-	data, err = ioutil.ReadAll(resp.Body)
-	return data, err
+	// Check response code
+	if resp.StatusCode >= 400 {
+		return []byte{}, fmt.Errorf("HTTP error: %d", resp.StatusCode)
+	}
+
+	// Read the response body with a size limit to prevent memory explosions
+	// Limit to 10MB max file size
+	const maxSize = 10 * 1024 * 1024
+	return ioutil.ReadAll(io.LimitReader(resp.Body, maxSize))
 }
+
+// Cache for repository popularity to avoid repeated HTTP requests
+var repoPopularityCache = make(map[string]bool)
+var repoCacheMutex sync.RWMutex
 
 // RepoIsUnpopular uses stars/forks/watchers to determine the popularity of a repo.
 func RepoIsUnpopular(client *http.Client, result RepoSearchResult) bool {
-	resp, err := client.Get("https://github.com/" + result.Repo)
-	if err != nil {
-		log.Fatal(err)
+	// Check cache first
+	repoCacheMutex.RLock()
+	if isUnpopular, exists := repoPopularityCache[result.Repo]; exists {
+		repoCacheMutex.RUnlock()
+		return isUnpopular
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	repoCacheMutex.RUnlock()
+
+	// Default timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create a request with timeout context
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://github.com/"+result.Repo, nil)
 	if err != nil {
-		log.Fatal(err)
+		// If we can't create the request, assume unpopular to be safe
+		return true
 	}
 
-	resp.Body.Close()
-	strData := string(data)
-	// fmt.Println(strData)
+	TrackAPIRequest("GitHub Web", fmt.Sprintf("GET https://github.com/%s (check popularity)", result.Repo))
+	resp, err := client.Do(req)
+	if err != nil {
+		// Network error, assume unpopular to be safe
+		return true
+	}
+	defer resp.Body.Close()
+
+	// Only read a limited amount of the response
+	bodyBytes, err := ioutil.ReadAll(io.LimitReader(resp.Body, 100*1024)) // Limit to 100KB
+	if err != nil {
+		return true
+	}
+
+	// Convert to string for regex search
+	strData := string(bodyBytes)
+
+	// Parse star count
 	regex := regexp.MustCompile("aria\\-label\\=\"(\\d+)\\suser(s?)\\sstarred\\sthis")
 	match := regex.FindStringSubmatch(strData)
+
+	isUnpopular := true
 	if len(match) > 1 {
 		stars, err := strconv.Atoi(match[1])
-		if err != nil {
-			log.Fatal(err)
-		}
-		if stars > 6 {
-			return false
+		if err == nil && stars > 6 {
+			isUnpopular = false
 		}
 	}
-	return true
+
+	// Cache the result
+	repoCacheMutex.Lock()
+	repoPopularityCache[result.Repo] = isUnpopular
+	repoCacheMutex.Unlock()
+
+	return isUnpopular
 }
 
 // GetRawGistPage gets the source code for a Gist.
 func GetRawGistPage(client *http.Client, gist string) string {
+	TrackAPIRequest("GitHub Web", fmt.Sprintf("GET https://gist.github.com/%s (get gist)", gist))
 	resp, err := client.Get("https://gist.github.com/" + gist)
 	if err != nil {
 		log.Fatal(err)

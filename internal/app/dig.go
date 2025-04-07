@@ -20,28 +20,28 @@ import (
 var queue []RepoSearchResult
 var reposStored = 0
 var finishedRepos []string
-var pool = make(chan bool, 10)
-var poolInitialized = false
+var reposMutex sync.Mutex
 
 // Dig into the secrets of a repo
-func Dig(result RepoSearchResult) (matches []Match) {
-	// fmt.Println(result.Repo)
-	if !poolInitialized {
-		pool = make(chan bool, GetFlags().Threads)
-		poolInitialized = true
-	}
-	matchChannel := make(chan []Match)
-	pool <- true
-	go func() {
+func Dig(result RepoSearchResult) []*Match {
+	// Use a channel to receive results
+	matchChannel := make(chan []*Match, 1)
+
+	// Submit the dig job to the global worker pool
+	GetGlobalPool().Submit(func() {
 		matchChannel <- digHelper(result)
-		<-pool
 		close(matchChannel)
-	}()
-	matches = <-matchChannel
+	})
+
+	// Wait for the results
+	matches := <-matchChannel
 	return matches
 }
 
-func digHelper(result RepoSearchResult) (matches []Match) {
+func digHelper(result RepoSearchResult) []*Match {
+	// Pre-allocate matches slice
+	matches := make([]*Match, 0, 10)
+
 	if GetFlags().Debug {
 		fmt.Println("Digging " + result.Repo)
 	}
@@ -78,16 +78,24 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 			if GetFlags().Debug {
 				fmt.Println("Finished cloning " + result.Repo)
 			}
+
+			// Use mutex to protect shared variables
+			reposMutex.Lock()
 			reposStored++
-			if reposStored%20 == 0 {
+			if reposStored%10 == 0 {
 				size, err := DirSize("/tmp/githound")
 				if err != nil {
 					log.Fatal(err)
 				}
-				if size > 50e+6 {
+				if size > 20e+6 {
+					// Release the lock before calling ClearFinishedRepos
+					reposMutex.Unlock()
 					ClearFinishedRepos()
+					reposMutex.Lock()
 				}
 			}
+			reposMutex.Unlock()
+
 			ref, err := repo.Head()
 			if err != nil {
 				if GetFlags().Debug {
@@ -124,11 +132,18 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 						fileResult := result
 						fileResult.File = file
 						score := 0
-						var newMatches []Match
-						for _, match := range MatchFileExtensions(file, fileResult) {
+						var newMatches []*Match
+
+						// Get pointer matches from the pool
+						fileExtMatches := MatchFileExtensions(file, fileResult)
+						// Convert to value matches
+						for _, match := range fileExtMatches {
 							newMatches = append(newMatches, match)
 							score += 5
 						}
+						// Return matches to the pool
+						PutMatches(fileExtMatches)
+
 						if float32(len(ascii))/float32(len(data)) < 0.9 {
 							// fmt.Println("skipping: " + file)
 						} else {
@@ -223,7 +238,7 @@ func digHelper(result RepoSearchResult) (matches []Match) {
 }
 
 // ScanDiff finds secrets in the diff between two Git trees.
-func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matches []Match) {
+func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matches []*Match) {
 	if from == to || from == nil || to == nil {
 		return matches
 	}
@@ -259,9 +274,13 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		}
 		matches, _ = GetMatchesForString(patchStr, result, true)
 		for _, diffFile := range diffData.Files {
-			for _, match := range MatchFileExtensions(diffFile.NewName, result) {
-				matches = append(matches, match)
+			fileExtMatches := MatchFileExtensions(diffFile.NewName, result)
+			// Convert pointer matches to value matches before appending
+			for _, ptrMatch := range fileExtMatches {
+				matches = append(matches, ptrMatch)
 			}
+			// Don't forget to return the matches to the pool
+			PutMatches(fileExtMatches)
 		}
 	}
 	return matches
@@ -282,12 +301,27 @@ func DirSize(path string) (int64, error) {
 	return size, err
 }
 
-// ClearFinishedRepos deletes the stored repos that have already been analyzed.
+// ClearFinishedRepos clears finished repos from disk
 func ClearFinishedRepos() {
-	for _, repoString := range finishedRepos {
-		os.RemoveAll("/tmp/githound/" + repoString)
+	// Lock for thread safety
+	reposMutex.Lock()
+	defer reposMutex.Unlock()
+
+	// More aggressive cleanup - remove all repos
+	err := os.RemoveAll("/tmp/githound")
+	if err != nil {
+		fmt.Println(err)
 	}
-	finishedRepos = nil
+
+	// Reset counters
+	reposStored = 0
+	finishedRepos = []string{}
+
+	// Recreate the base directory
+	err = os.MkdirAll("/tmp/githound", 0755)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 // ClearRepoStorage deletes all stored repos from the disk.

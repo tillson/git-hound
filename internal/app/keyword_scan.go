@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/v57/github"
@@ -42,6 +43,7 @@ type Line struct {
 
 var scannedRepos = make(map[string]bool)
 var uniqueMatches = make(map[string]bool)
+var mapMutex = sync.Mutex{} // Add mutex for map synchronization
 
 var customRegexes []*regexp.Regexp
 var loadedRegexes = false
@@ -73,31 +75,50 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			color.New(color.Faint).Println(repo.Contents)
 		}
 	} else {
+		// Get pointer matches
 		matches, score := GetMatchesForString(repo.Contents, repo, true)
-		if (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 && !scannedRepos[repo.Repo] {
-			scannedRepos[repo.Repo] = true
-			regex := regexp.MustCompile("(?i)(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
-				"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
-				"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
-			fileNameMatches := regex.FindAllString(repo.Repo, -1)
-			if len(fileNameMatches) == 0 {
-				dig_matches := Dig(repo)
-				for _, match := range dig_matches {
-					match.Attributes = append(match.Attributes, "dig-files")
-					matches = append(matches, match)
+
+		// Process potential additional matches from digging
+		if (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
+			// Lock the map for thread-safe access
+			mapMutex.Lock()
+			repoAlreadyScanned := scannedRepos[repo.Repo]
+			if !repoAlreadyScanned {
+				scannedRepos[repo.Repo] = true
+			}
+			mapMutex.Unlock()
+
+			if !repoAlreadyScanned {
+				regex := regexp.MustCompile("(?i)(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
+					"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
+					"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
+				fileNameMatches := regex.FindAllString(repo.Repo, -1)
+				if len(fileNameMatches) == 0 {
+					// Get additional matches from Dig function
+					dig_matches := Dig(repo)
+					for _, match := range dig_matches {
+						// Add the dig-files attribute directly to the pointer match
+						match.Attributes = append(match.Attributes, "dig-files")
+
+						// Add to matches - no need to copy since Dig now returns []*Match
+						matches = append(matches, match)
+					}
 				}
 			}
 		}
 
+		// Process and display matches
 		if len(matches) > 0 {
-			// fmt.Println((repo.Raw), "score:", score)
-
+			// Fetch GitHub API info about the repo
 			token := viper.GetString("github_access_token")
 			client := github.NewClient(nil).WithAuthToken(token)
 			if client != nil {
 				// gh_repo_obj, _, err := client.Repositories.Get(strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1])
 				// get repo's commits
-				commits, _, err := client.Repositories.ListCommits(context.Background(), strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1], &github.CommitsListOptions{
+				owner := strings.Split(repo.Repo, "/")[0]
+				repoName := strings.Split(repo.Repo, "/")[1]
+				TrackAPIRequest("ListCommits", fmt.Sprintf("Owner: %s, Repo: %s, Path: %s", owner, repoName, repo.File))
+				commits, _, err := client.Repositories.ListCommits(context.Background(), owner, repoName, &github.CommitsListOptions{
 					Path: repo.File,
 				})
 				if err != nil {
@@ -121,11 +142,19 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 					"file_last_author":  repo.SourceFileLastAuthorEmail,
 					"url":               GetResultLink(repo, result),
 				}
+
+				// Use mutex to protect access to uniqueMatches map
 				matchKey := fmt.Sprintf("%s|%s", resultPayload["match"], resultRepoURL)
-				if uniqueMatches[matchKey] {
+				mapMutex.Lock()
+				isDuplicate := uniqueMatches[matchKey]
+				if !isDuplicate {
+					uniqueMatches[matchKey] = true
+				}
+				mapMutex.Unlock()
+
+				if isDuplicate {
 					continue
 				}
-				uniqueMatches[matchKey] = true
 
 				if i == 0 {
 					if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
@@ -158,16 +187,23 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			if GetFlags().Debug {
 				fmt.Println("Finished scanning " + repo.Repo + "...")
 			}
+
+			// Clean up the matches by returning them to the pool
+			PutMatches(matches)
 		}
 	}
 	SearchWaitGroup.Done()
 }
 
 // MatchKeywords takes a string and checks if it contains sensitive information using pattern matching.
-func MatchKeywords(source string) (matches []Match) {
+func MatchKeywords(source string) (matches []*Match) {
 	if GetFlags().NoKeywords || source == "" {
 		return matches
 	}
+
+	// Pre-allocate the matches slice to reduce reallocations
+	// Start with a reasonable capacity based on typical match counts
+	matches = make([]*Match, 0, 10)
 
 	// Loop over regexes from database
 	for _, regex := range GetFlags().TextRegexes {
@@ -192,12 +228,17 @@ func MatchKeywords(source string) (matches []Match) {
 
 			if shouldMatch {
 				line := GetLine(source, matchText)
-				matches = append(matches, Match{
-					Attributes: []string{regex.ID, regex.Description},
-					Text:       matchText,
-					Expression: expressionStr,
-					Line:       line,
-				})
+
+				// Get a Match from the pool instead of creating a new one
+				match := GetMatch()
+				match.Text = matchText
+				match.Expression = expressionStr
+				match.Line = line
+
+				// Add attributes - reuse existing slice
+				match.Attributes = append(match.Attributes, regex.ID, regex.Description)
+
+				matches = append(matches, match)
 			}
 		}
 	}
@@ -206,10 +247,13 @@ func MatchKeywords(source string) (matches []Match) {
 }
 
 // MatchCustomRegex matches a string against a slice of regexes.
-func MatchCustomRegex(source string) (matches []Match) {
+func MatchCustomRegex(source string) (matches []*Match) {
 	if source == "" {
 		return matches
 	}
+
+	// Pre-allocate the matches slice
+	matches = make([]*Match, 0, 5)
 
 	for _, regex := range customRegexes {
 		// Find all match indices instead of just strings
@@ -219,12 +263,16 @@ func MatchCustomRegex(source string) (matches []Match) {
 			matchText := source[matchIndex[0]:matchIndex[1]]
 			line := GetLine(source, matchText)
 
-			matches = append(matches, Match{
-				Attributes: []string{"regex"},
-				Text:       matchText,
-				Expression: regex.String(),
-				Line:       line,
-			})
+			// Get a Match from the pool instead of creating a new one
+			match := GetMatch()
+			match.Text = matchText
+			match.Expression = regex.String()
+			match.Line = line
+
+			// Add attributes - reuse existing slice
+			match.Attributes = append(match.Attributes, "regex")
+
+			matches = append(matches, match)
 		}
 	}
 
@@ -232,10 +280,13 @@ func MatchCustomRegex(source string) (matches []Match) {
 }
 
 // MatchFileExtensions matches interesting file extensions.
-func MatchFileExtensions(source string, result RepoSearchResult) (matches []Match) {
+func MatchFileExtensions(source string, result RepoSearchResult) (matches []*Match) {
 	if GetFlags().NoFiles || source == "" {
 		return matches
 	}
+
+	// Pre-allocate the matches slice
+	matches = make([]*Match, 0, 3)
 
 	regexString := "(?i)(vim_settings\\.xml)(\\.(zip|env|docx|xlsx|pptx|pdf))$"
 	regex := regexp.MustCompile(regexString)
@@ -247,12 +298,16 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []Matc
 		matchText := source[matchIndex[0]:matchIndex[1]]
 		line := GetLine(source, matchText)
 
-		matches = append(matches, Match{
-			Attributes: []string{"interesting_filename"},
-			Text:       matchText,
-			Expression: regex.String(),
-			Line:       line,
-		})
+		// Get a Match from the pool instead of creating a new one
+		match := GetMatch()
+		match.Text = matchText
+		match.Expression = regex.String()
+		match.Line = line
+
+		// Add attributes - reuse existing slice
+		match.Attributes = append(match.Attributes, "interesting_filename")
+
+		matches = append(matches, match)
 	}
 
 	return matches
@@ -281,12 +336,12 @@ func PrintContextLine(line Line) {
 }
 
 // PrintPatternLine pretty-prints the regex used to find the leak
-func PrintPatternLine(match Match) {
-	fmt.Printf("RegEx Pattern: %s\n", match.Expression)
+func PrintPatternLine(match *Match) {
+	color.New(color.Faint).Println("pattern:   " + match.Expression)
 }
 
-func PrintAttributes(match Match) {
-	fmt.Printf("Attributes: %v\n", match.Attributes)
+func PrintAttributes(match *Match) {
+	color.New(color.Faint).Printf("tags:      %s\n", strings.Join(match.Attributes, ", "))
 }
 
 // Entropy calculates the Shannon entropy of a string
@@ -306,21 +361,19 @@ func Entropy(str string) (entropy float32) {
 }
 
 // GetResultLink returns a link to the result.
-func GetResultLink(result RepoSearchResult, match Match) string {
-	if match.Commit != "" {
-		return "https://github.com/" + result.Repo + "/commit/" + match.Commit
-	} else {
-		file := match.File
-		if file == "" {
-			file = result.File
-		}
-		return result.URL
+func GetResultLink(result RepoSearchResult, match *Match) string {
+	if result.Source == "gist" {
+		return "https://gist.github.com/" + result.Raw
 	}
+	return result.URL
 }
 
 // GetMatchesForString runs pattern matching and scoring checks on the given string
 // and returns the matches.
-func GetMatchesForString(source string, result RepoSearchResult, recursion bool) (matches []Match, score int) {
+func GetMatchesForString(source string, result RepoSearchResult, recursion bool) ([]*Match, int) {
+	// Pre-allocate the matches slice to reduce reallocations
+	matches := make([]*Match, 0, 10)
+	score := 0
 
 	// Undecode any base64 and run again
 	base64Regex := "\\b[a-zA-Z0-9/+]{8,}={0,2}\\b"
@@ -343,8 +396,8 @@ func GetMatchesForString(source string, result RepoSearchResult, recursion bool)
 				contextSource := source[start:indices[0]] + decodedStr + source[indices[1]:end]
 				decodedMatches, new_score := GetMatchesForString(contextSource, result, false)
 				base64_score += new_score
-				for _, match := range decodedMatches {
-					match.Attributes = append(match.Attributes, "base64")
+				for _, decodedMatch := range decodedMatches {
+					decodedMatch.Attributes = append(decodedMatch.Attributes, "base64")
 				}
 				matches = append(matches, decodedMatches...)
 			}
@@ -352,57 +405,52 @@ func GetMatchesForString(source string, result RepoSearchResult, recursion bool)
 	}
 
 	if !GetFlags().NoKeywords {
-		for _, match := range MatchKeywords(source) {
-			matches = append(matches, match)
-			score += 2
-		}
+		// Get pointer matches from MatchKeywords
+		keywordMatches := MatchKeywords(source)
+		// No need to convert to value matches, just append directly
+		matches = append(matches, keywordMatches...)
+		score += len(keywordMatches) * 2
 	}
+
 	if !GetFlags().NoScoring {
-		matched, err := regexp.MatchString("(?i)(h1domains|bugbounty|bug\\-bounty|bounty\\-targets|url_short|url_list|alexa)", result.Repo+result.File)
-		CheckErr(err)
-		if matched {
-			score -= 3
-		}
-		matched, err = regexp.MatchString("(?i)(\\.md|\\.csv)$", result.File)
-		CheckErr(err)
-		if matched {
-			score -= 2
-		}
-		matched, err = regexp.MatchString("^vim_settings.xml$", result.File)
-		CheckErr(err)
-		if matched {
-			score += 5
-		}
-		if len(matches) > 0 {
-			matched, err = regexp.MatchString("(?i)\\.(json|yml|py|rb|java)$", result.File)
-			CheckErr(err)
-			if matched {
-				score++
-			}
-			matched, err = regexp.MatchString("(?i)\\.(xlsx|docx|doc)$", result.File)
-			CheckErr(err)
-			if matched {
-				score += 3
+		for _, blacklistRegex := range []string{
+			"github.com/docker/docker",
+			"google.golang.org/appengine",
+			"google.golang.org/grpc",
+			"^package ",
+			"^import ",
+			"^module ",
+			"\"github.com/",
+			"\"golang.org/",
+			"\"google.golang.org/",
+		} {
+			regex := regexp.MustCompile(blacklistRegex)
+			if regex.MatchString(source) {
+				score -= 1
 			}
 		}
-		// regex := regexp.MustCompile("(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
-		// 	"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
-		// 	"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
-		// fileNameMatches := regex.FindAllString(result.File, -1)
-		// CheckErr(err)
-		// if len(fileNameMatches) > 0 {
-		// 	score -= int(math.Pow(2, float64(len(fileNameMatches))))
-		// }
-		if score <= 0 && !GetFlags().NoScoring {
-			matches = nil
-		}
 	}
-	if GetFlags().NoScoring {
-		score = 1000
+	if !GetFlags().NoScoring && base64_score > 0 {
+		score += 1
 	}
-
-	// score = score // + (base64_score - len(base64Strings)*score)
-
+	if !GetFlags().NoScoring && strings.Contains(result.File, ".go") {
+		score -= 1
+	}
+	if !GetFlags().NoScoring && result.Repo != "" && strings.Contains(strings.ToLower(result.Repo), "demo") {
+		score -= 1
+	}
+	if !GetFlags().NoScoring && result.Repo != "" && strings.Contains(strings.ToLower(result.Repo), "tutorial") {
+		score -= 1
+	}
+	if !GetFlags().NoScoring && strings.HasSuffix(result.File, ".java") || strings.HasSuffix(result.File, ".cs") {
+		score += 1
+	}
+	if !GetFlags().NoScoring && (strings.Contains(strings.ToLower(result.File), "secret") || strings.Contains(strings.ToLower(result.File), "password")) {
+		score += 1
+	}
+	if !GetFlags().NoScoring && (strings.Contains(source, "BEGIN RSA") || strings.Contains(source, "BEGIN DSA") || strings.Contains(source, "BEGIN EC")) {
+		score += 2
+	}
 	return matches, score
 }
 

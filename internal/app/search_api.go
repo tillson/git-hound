@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -15,7 +16,24 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Semaphore to limit concurrent HTTP requests
+var httpSemaphore chan struct{}
+var httpSemaphoreOnce sync.Once
+
+func initHTTPSemaphore() {
+	httpSemaphoreOnce.Do(func() {
+		threads := GetFlags().Threads
+		if threads <= 0 {
+			threads = 10
+		}
+		httpSemaphore = make(chan struct{}, threads)
+	})
+}
+
 func SearchWithAPI(queries []string) {
+	// Initialize HTTP request limiter
+	initHTTPSemaphore()
+
 	token := viper.GetString("github_access_token")
 	client := github.NewClient(nil).WithAuthToken(token)
 	if client == nil {
@@ -45,15 +63,17 @@ func SearchWithAPI(queries []string) {
 		}
 		for page := 0; page < int(math.Min(10, float64(GetFlags().Pages))); page++ {
 			options.Page = page
+			TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d", query, page))
 			result, _, err := client.Search.Code(context.Background(), query, &options)
 			for err != nil {
-
+				fmt.Println(err)
 				resetTime := extractResetTime(err.Error())
 				sleepDuration := resetTime + 3
 				// color.Yellow("Sleeping for %d seconds", sleepDuration)
 				color.Yellow("[!] GitHub API limit exceeded. Sleeping for %d seconds...", sleepDuration)
 				time.Sleep(time.Duration(sleepDuration) * time.Second)
 				backoff = backoff * 1.5
+				TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d (retry)", query, page))
 				result, _, err = client.Search.Code(context.Background(), query, &options)
 			}
 
@@ -62,6 +82,10 @@ func SearchWithAPI(queries []string) {
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
 				fmt.Println("Analyzing " + strconv.Itoa(result.GetTotal()) + " repos on page " + strconv.Itoa(page+1) + "...")
 			}
+
+			// Initialize the worker pool if not already done
+			workerPool := GetGlobalPool()
+
 			for _, code_result := range result.CodeResults {
 				// fmt.Println(code_result.GetPath())
 				author_repo_str := code_result.GetRepository().GetOwner().GetLogin() + "/" + code_result.GetRepository().GetName()
@@ -73,14 +97,23 @@ func SearchWithAPI(queries []string) {
 					sha = matches[1]
 				}
 
-				SearchWaitGroup.Add(1)
-				go ScanAndPrintResult(&http_client, RepoSearchResult{
+				// Create a repo result object to pass to the worker
+				repoResult := RepoSearchResult{
 					Repo:   author_repo_str,
 					File:   code_result.GetPath(),
 					Raw:    author_repo_str + "/" + sha + "/" + code_result.GetPath(),
 					Source: "repo",
 					Query:  query,
 					URL:    "https://github.com/" + author_repo_str + "/blob/" + sha + "/" + code_result.GetPath(),
+				}
+
+				// Increment the wait group before submitting the job
+				SearchWaitGroup.Add(1)
+
+				// Submit the job to the worker pool instead of creating a goroutine directly
+				workerPool.Submit(func() {
+					// Process the repository in the worker pool
+					ScanAndPrintResult(&http_client, repoResult)
 				})
 			}
 		}

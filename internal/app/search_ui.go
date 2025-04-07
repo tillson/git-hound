@@ -255,13 +255,24 @@ func SearchGitHub(query string, options SearchOptions, client *http.Client, resu
 							}
 							resultSet[(result.RepoName + result.Path)] = true
 							SearchWaitGroup.Add(1)
-							go ScanAndPrintResult(client, RepoSearchResult{
-								Repo:   result.RepoName,
-								File:   result.Path,
-								Raw:    result.RepoName + "/" + result.CommitSha + "/" + result.Path,
-								Source: "repo",
-								Query:  query,
-								URL:    "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
+
+							// Use worker pool instead of creating a goroutine directly
+							workerPool := GetGlobalPool()
+
+							// Create a repo result to pass to the worker
+							repoResult := RepoSearchResult{
+								Repo:     result.RepoName,
+								File:     result.Path,
+								Raw:      result.RepoName + "/" + result.CommitSha + "/" + result.Path,
+								Contents: result.RepoName + "/" + result.CommitSha + "/" + result.Path,
+								Source:   "repo",
+								Query:    query,
+								URL:      "https://github.com/" + result.RepoName + "/blob/" + result.CommitSha + "/" + result.Path,
+							}
+
+							// Submit the job to the worker pool
+							workerPool.Submit(func() {
+								ScanAndPrintResult(client, repoResult)
 							})
 							// fmt.Println(result.RepoName + "/" + result.DefaultBranch + "/" + result.Path)
 						}
@@ -354,13 +365,24 @@ func SearchGist(query string, options SearchOptions, client *http.Client, result
 				}
 				resultSet[element[1]] = true
 				SearchWaitGroup.Add(1)
-				go ScanAndPrintResult(client, RepoSearchResult{
-					Repo:   element[1],
-					File:   element[1],
-					Raw:    GetRawGistPage(client, element[1]),
-					Source: "gist",
-					Query:  query,
-					URL:    "https://gist.github.com/" + element[1],
+
+				// Use worker pool instead of creating a goroutine directly
+				workerPool := GetGlobalPool()
+
+				// Create a gist result to pass to the worker
+				gistResult := RepoSearchResult{
+					Repo:     "gist:" + element[1],
+					File:     element[1],
+					Raw:      GetRawGistPage(client, element[1]),
+					Contents: GetRawGistPage(client, element[1]),
+					Source:   "gist",
+					Query:    query,
+					URL:      "https://gist.github.com/" + element[1] + "#file-" + element[1],
+				}
+
+				// Submit the job to the worker pool
+				workerPool.Submit(func() {
+					ScanAndPrintResult(client, gistResult)
 				})
 			}
 		}
