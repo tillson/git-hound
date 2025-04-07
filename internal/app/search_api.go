@@ -80,7 +80,7 @@ func SearchWithAPI(queries []string) {
 			backoff = backoff / 1.5
 			backoff = math.Max(1, backoff)
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
-				fmt.Println("Analyzing " + strconv.Itoa(result.GetTotal()) + " repos on page " + strconv.Itoa(page+1) + "...")
+				fmt.Println("Analyzing " + strconv.Itoa(len(result.CodeResults)) + " repos on page " + strconv.Itoa(page+1) + "...")
 			}
 
 			// Initialize the worker pool if not already done
