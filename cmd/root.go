@@ -180,6 +180,12 @@ var rootCmd = &cobra.Command{
 }
 
 func LoadRegexFile(path string) []app.Rule {
+	// Skip processing if the file is named LICENSE
+	baseName := filepath.Base(path)
+	if baseName == "LICENSE" {
+		return nil
+	}
+
 	file, err := os.OpenFile(path, os.O_RDONLY, 0600)
 	if err != nil {
 		color.Yellow("[!] Error opening rules file %v: %v", app.GetFlags().RegexFile+"", err)
