@@ -6,17 +6,7 @@ rules:
   # `header . payload . signature`, all base64-encoded
   # Unencoded, the header and payload are JSON objects, usually starting with
   # `{"`, which gets base64-encoded starting with `ey`.
-  pattern: |
-    (?x)
-    \b
-    (
-      ey[a-zA-Z0-9_-]+      (?# header )
-      \.
-      ey[a-zA-Z0-9_-]+      (?# payload )
-      \.
-      [a-zA-Z0-9_-]+        (?# signature )
-    )
-    (?:[^a-zA-Z0-9_-]|$)    (?# this instead of a \b anchor because that doesn't play nicely with `-` )
+  pattern: \b(ey[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+)(?:[^a-zA-Z0-9_-]|$)
 
   references:
   - https://en.wikipedia.org/wiki/JSON_Web_Token

@@ -3,7 +3,7 @@ rules:
 - name: Google Client ID
   id: np.google.1
 
-  pattern: '(?i)\b([0-9]+-[a-z0-9_]{32})\.apps\.googleusercontent\.com'
+  pattern: \b([0-9]+-[a-z0-9_]{32})\.apps\.googleusercontent\.com\b
 
   examples:
   - "                 'clientID' : '231545488769-4d1mcev9vifvlncrern52id2pqqf5u5l.apps.googleusercontent.com',"
@@ -15,11 +15,7 @@ rules:
 - name: Google OAuth Client Secret (prefixed)
   id: np.google.2
 
-  pattern: |
-    (?x)
-    \b
-    (GOCSPX-[a-zA-Z0-9_-]{28})
-    (?:[^a-zA-Z0-9_-] | $)
+  pattern: \b(GOCSPX-[a-zA-Z0-9_-]{28})(?:[^a-zA-Z0-9_-]|$)
 
   examples:
   - 'const CLIENTSECRET = "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"'
@@ -27,8 +23,7 @@ rules:
 - name: Google OAuth Client Secret
   id: np.google.3
 
-  pattern: (?i:client.?secret.{0,10}\b([a-z0-9_-]{24})(?:[^a-z0-9_-]|$))
-
+  pattern: client.?secret.{0,10}\b([a-z0-9_-]{24})(?:[^a-z0-9_-]|$)
 
   examples:
   - '"client_secret":"aaaaaaaaaaaaaaaaaaaaaaa-"'
@@ -39,11 +34,7 @@ rules:
 - name: Google OAuth Access Token
   id: np.google.4
 
-  pattern: |
-    (?x)
-    \b
-    (ya29\.[0-9A-Za-z_-]{20,1024})
-    (?: [^0-9A-Za-z_-]|$)  (?# Used instead of `\b` because that doesn't play well with trailing `-` )
+  pattern: \b(ya29\.[0-9A-Za-z_-]{20,100})(?:[^0-9A-Za-z_-]|$)
 
   examples:
   - |
@@ -64,7 +55,7 @@ rules:
 - name: Google API Key
   id: np.google.5
 
-  pattern: '\b(AIza[0-9A-Za-z_-]{35})\b'
+  pattern: \b(AIza[0-9A-Za-z_-]{35})\b
   references:
   - https://cloud.google.com/docs/authentication/api-keys#securing
   - https://support.google.com/googleapi/answer/6310037
@@ -76,14 +67,7 @@ rules:
 - name: Google Cloud Storage Bucket (subdomain style)
   id: np.gcs.1
 
-  pattern: |
-    (?x)
-    (?: ^ | [\s/"'] | %2F )
-    (
-    (?: [a-zA-Z0-9_-]+ \. )+    (?# bucket name as subdomain )
-    storage\.googleapis\.com
-    )
-    \b
+  pattern: (?:^|[\s/"']|%2F)((?:[a-zA-Z0-9_-]+\.)+storage\.googleapis\.com)\b
 
   references:
   - https://cloud.google.com/storage/docs/request-endpoints
@@ -99,15 +83,7 @@ rules:
 - name: Google Cloud Storage Bucket (path style)
   id: np.gcs.2
 
-  pattern: |
-    (?x)
-    (?: ^ | [\s/"'] | %2F )
-    (
-    storage\.googleapis\.com
-    /
-    [a-zA-Z0-9_-]+ (?: \. [a-zA-Z0-9_-]+ )*    (?# bucket name as path )
-    )
-    (?: [^a-zA-Z0-9_-] | $ )                   (?# this instead of a \b anchor because that doesn't play nicely with `-` )
+  pattern: (?:^|[\s/"']|%2F)(storage\.googleapis\.com/[a-zA-Z0-9_-]+(?:\.[a-zA-Z0-9_-]+)*)(?:[^a-zA-Z0-9_-]|$)
 
   references:
   - https://cloud.google.com/storage/docs/request-endpoints

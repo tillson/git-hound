@@ -16,15 +16,7 @@ rules:
 - name: React App Username
   id: np.reactapp.1
 
-  pattern: |
-    (?x)(?i)
-    \b
-    REACT_APP (?: _[A-Z0-9]+)* _USER (?: NAME)?          (?# variable name )
-    \s* = \s*
-    ['"]?
-    ( [^\s'"$]{3,} )                                     (?# value )
-    (?: [\s'"$] | $ )
-
+  pattern: \bREACT_APP(?:_[A-Z0-9]+)*_USER(?:NAME)?\s*=\s*['"]?([^\s'"$]{3,})(?:[\s'"$]|$)
 
   references:
   - https://create-react-app.dev/docs/adding-custom-environment-variables/
@@ -45,15 +37,7 @@ rules:
 - name: React App Password
   id: np.reactapp.2
 
-  pattern: |
-    (?x)(?i)
-    \b
-    REACT_APP (?: _[A-Z0-9]+)* _PASS (?: WORD)?          (?# variable name )
-    \s* = \s*
-    ['"]?
-    ( [^\s'"$]{6,} )                                     (?# value )
-    (?: [\s'"$] | $ )
-
+  pattern: \bREACT_APP(?:_[A-Z0-9]+)*_PASS(?:WORD)?\s*=\s*['"]?([^\s'"$]{6,})(?:[\s'"$]|$)
 
   references:
   - https://create-react-app.dev/docs/adding-custom-environment-variables/

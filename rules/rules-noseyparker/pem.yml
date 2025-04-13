@@ -6,13 +6,7 @@ rules:
   id: np.pem.1
 
   # Note: This is intended to match many PEM-encoded base64 payloads
-  pattern: |
-    (?x)
-    -----BEGIN\ .{0,20}\ ?PRIVATE\ KEY\ ?.{0,20}-----
-    \s*
-    ( (?: [a-zA-Z0-9+/=\s"',] | \\r | \\n ) {50,} )
-    \s*
-    -----END\ .{0,20}\ ?PRIVATE\ KEY\ ?.{0,20}-----
+  pattern: -----BEGIN\ .{0,20}\ ?PRIVATE\ KEY\ ?.{0,20}-----\s*((?:[a-zA-Z0-9+/=\s"',]|\\r|\\n){50,})\s*-----END\ .{0,20}\ ?PRIVATE\ KEY\ ?.{0,20}-----
 
   references:
   - https://en.wikipedia.org/wiki/Privacy-Enhanced_Mail

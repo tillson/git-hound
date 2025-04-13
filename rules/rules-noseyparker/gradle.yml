@@ -4,14 +4,7 @@ rules:
 - name: Hardcoded Gradle Credentials
   id: np.gradle.1
 
-  pattern: |
-    (?x)
-    (?i)
-    credentials \s* \{
-      (?:\s*//.*)*        (?# skip line comments)
-      \s* (?:username|password) \s+ ['"]([^'"]{1,60})['"]
-      (?:\s*//.*)*        (?# skip line comments)
-      \s* (?:username|password) \s+ ['"]([^'"]{1,60})['"]
+  pattern: credentials\s*\{[\s\S]*?(?:username|password)\s+['"]([^'"]{1,60})['"][\s\S]*?(?:username|password)\s+['"]([^'"]{1,60})['"]
 
   examples:
   - |

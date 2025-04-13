@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,12 +36,29 @@ func SearchWithAPI(queries []string) {
 	initHTTPSemaphore()
 
 	token := viper.GetString("github_access_token")
-	client := github.NewClient(nil).WithAuthToken(token)
-	if client == nil {
-		color.Red("[!] Unable to authenticate with GitHub API. Please check that your GitHub personal access token is correct.")
+	if token == "" {
+		color.Red("[!] GitHub access token not found. Please set it using --token or in your config file.")
 		os.Exit(1)
 	}
-	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+
+	client := github.NewClient(nil).WithAuthToken(token)
+	if client == nil {
+		color.Red("[!] Unable to create GitHub client. Please check your configuration.")
+		os.Exit(1)
+	}
+
+	// Test the token by making a simple API call
+	_, _, err := client.Users.Get(context.Background(), "")
+	if err != nil {
+		if strings.Contains(err.Error(), "401") {
+			color.Red("[!] Invalid GitHub access token. Please check that your token is correct and has the necessary permissions.")
+		} else {
+			color.Red("[!] Error authenticating with GitHub: %v", err)
+		}
+		os.Exit(1)
+	}
+
+	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput && GetFlags().Debug {
 		color.Cyan("[*] Logged into GitHub using API key")
 	}
 
@@ -63,23 +81,28 @@ func SearchWithAPI(queries []string) {
 		}
 		for page := 0; page < int(math.Min(10, float64(GetFlags().Pages))); page++ {
 			options.Page = page
-			TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d", query, page))
+			if GetFlags().Debug {
+				TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d", query, page))
+			}
 			result, _, err := client.Search.Code(context.Background(), query, &options)
 			for err != nil {
 				fmt.Println(err)
 				resetTime := extractResetTime(err.Error())
 				sleepDuration := resetTime + 3
-				// color.Yellow("Sleeping for %d seconds", sleepDuration)
-				color.Yellow("[!] GitHub API limit exceeded. Sleeping for %d seconds...", sleepDuration)
+				if GetFlags().Debug {
+					color.Yellow("[!] GitHub API limit exceeded. Sleeping for %d seconds...", sleepDuration)
+				}
 				time.Sleep(time.Duration(sleepDuration) * time.Second)
 				backoff = backoff * 1.5
-				TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d (retry)", query, page))
+				if GetFlags().Debug {
+					TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d (retry)", query, page))
+				}
 				result, _, err = client.Search.Code(context.Background(), query, &options)
 			}
 
 			backoff = backoff / 1.5
 			backoff = math.Max(1, backoff)
-			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput && GetFlags().Debug {
 				fmt.Println("Analyzing " + strconv.Itoa(len(result.CodeResults)) + " repos on page " + strconv.Itoa(page+1) + "...")
 			}
 

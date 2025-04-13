@@ -3,11 +3,7 @@ rules:
 - name: OpenAI API Key
   id: np.openai.1
 
-  pattern: |
-    (?x)
-    \b
-    (sk-[a-zA-Z0-9]{48})
-    \b
+  pattern: \b(sk-[a-zA-Z0-9]{48})\b
 
   examples:
   - |

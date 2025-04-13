@@ -3,13 +3,7 @@ rules:
 - name: netrc Credentials
   id: np.netrc.1
 
-  pattern: |
-    (?x)
-    (?: (machine \s+ [^\s]+) | default)
-    \s+
-    login \s+ ([^\s]+)
-    \s+
-    password \s+ ([^\s]+)
+  pattern: (?:machine\s+[^\s]+|default)\s+login\s+([^\s]+)\s+password\s+([^\s]+)
 
   references:
   - https://everything.curl.dev/usingcurl/netrc

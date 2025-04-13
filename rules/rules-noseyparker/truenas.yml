@@ -3,11 +3,7 @@ rules:
 - name: TrueNAS API Key (WebSocket)
   id: np.truenas.1
 
-  pattern: |
-    (?x)
-    "params"\s*:\s*\[\s*"
-    (\d+-[a-zA-Z0-9]{64})
-    "\s*\]
+  pattern: '"params"\s*:\s*\[\s*"(\d+-[a-zA-Z0-9]{64})"\s*\]'
 
   examples:
   - '{"id":"3286a508-a6ca-278a-c078-85b2b515d8d2", "msg":"method", "method":"auth.login_with_api_key", "params":["8-Lp22ov7halMBLUpG97Wg4y7fibQi3CW19VJiZcCu746zgCs0mdDdTCoOcpgEucgu"]}'
@@ -34,11 +30,7 @@ rules:
 - name: TrueNAS API Key (REST API)
   id: np.truenas.2
 
-  pattern: |
-    (?x)
-    Bearer\s*
-    (\d+-[a-zA-Z0-9]{64})
-    \b
+  pattern: Bearer\s*(\d+-[a-zA-Z0-9]{64})\b
 
   examples:
   # only "Bearer" is accepted by TrueNAS API (no "bearer" etc.)

@@ -3,15 +3,7 @@ rules:
 - name: Twitter Client ID
   id: np.twitter.1
 
-  pattern: |
-    (?x)(?i)
-    \b twitter
-    .?
-    (?: api | app | application | client | consumer | customer )?
-    .?
-    (?: id | identifier | key )
-    .{0,2} \s{0,20} .{0,2} \s{0,20} .{0,2}  (?# string terminators, whitespace, binding operators, etc )
-    \b ([a-z0-9]{18,25}) \b
+  pattern: \btwitter.?(?:api|app|application|client|consumer|customer)?.?(?:id|identifier|key).{0,2}\s{0,20}.{0,2}\s{0,20}.{0,2}\b([a-z0-9]{18,25})\b
 
   references:
   - https://developer.twitter.com/en/docs/authentication/overview
@@ -26,15 +18,7 @@ rules:
 - name: Twitter Secret Key
   id: np.twitter.2
 
-  pattern: |
-    (?x)(?i)
-    twitter
-    .?
-    (?: api | app | application | client | consumer | customer | secret | key )
-    .?
-    (?: key | oauth | sec | secret )?
-    .{0,2} \s{0,20} .{0,2} \s{0,20} .{0,2}  (?# string terminators, whitespace, binding operators, etc )
-    \b ([a-z0-9]{35,44}) \b
+  pattern: twitter.?(?:api|app|application|client|consumer|customer|secret|key)?.?(?:key|oauth|sec|secret)?.{0,2}\s{0,20}.{0,2}\s{0,20}.{0,2}\b([a-z0-9]{35,44})\b
 
   references:
   - https://developer.twitter.com/en/docs/authentication/overview

@@ -3,11 +3,7 @@ rules:
 - name: Segment Public API Token
   id: np.segment.1
 
-  pattern: |
-    (?x)
-    \b
-    (sgp_[a-zA-Z0-9]{64})
-    \b
+  pattern: \b(sgp_[a-zA-Z0-9]{64})\b
 
   references:
   - https://segment.com/docs/api/public-api/

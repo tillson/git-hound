@@ -207,7 +207,7 @@ func LoadRegexFile(path string) []app.Rule {
 			return nil
 		}
 
-		if len(ruleConfig.Rules) > 0 {
+		if len(ruleConfig.Rules) > 0 && app.GetFlags().Debug {
 			color.Green("[+] Loaded %d regex rules from %s", len(ruleConfig.Rules), path)
 		}
 
@@ -289,7 +289,7 @@ func LoadRegexFile(path string) []app.Rule {
 	}
 
 	// Debug info about loaded rules
-	if len(ruleConfig.Rules) > 0 {
+	if len(ruleConfig.Rules) > 0 && app.GetFlags().Debug {
 		color.Green("[+] Loaded %d regex rules from %s", len(ruleConfig.Rules), path)
 	}
 

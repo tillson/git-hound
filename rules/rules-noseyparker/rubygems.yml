@@ -3,11 +3,7 @@ rules:
 - name: RubyGems API Key
   id: np.rubygems.1
 
-  pattern: |
-    (?x)(?i)
-    \b
-    (rubygems_[a-f0-9]{48})
-    \b
+  pattern: \b(rubygems_[a-f0-9]{48})\b
 
   references:
   - https://guides.rubygems.org/rubygems-org-api/

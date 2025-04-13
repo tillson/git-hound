@@ -3,11 +3,7 @@ rules:
 - name: Credentials in ODBC Connection String
   id: np.odbc.1
 
-  pattern: |
-    (?x)(?i)
-    (?: User | User\ Id | UserId | Uid) \s*=\s* ([^\s;]{3,100}) \s* ;
-    [ \t]* .{0,10} [ \t]*  (?# possible extra stuff, e.g., string concatenation)
-    (?: Password | Pwd) \s*=\s* ([^\s;]{3,100}) \s* (?: [;"'] | $)
+  pattern: (?:User|User\ Id|UserId|Uid)\s*=\s*([^\s;]{3,100})\s*;[ \t]*.{0,10}[ \t]*(?:Password|Pwd)\s*=\s*([^\s;]{3,100})\s*(?:[;"']|$)
 
   examples:
   - 'Server=host;Port=5432;User Id=username;Password=secret;Database=databasename;'

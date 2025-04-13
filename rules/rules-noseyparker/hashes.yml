@@ -2,7 +2,7 @@ rules:
 
 - name: Password Hash (md5crypt)
   id: np.pwhash.1
-  pattern: '(\$1\$[./A-Za-z0-9]{8}\$[./A-Za-z0-9]{22})'
+  pattern: (\$1\$[./A-Za-z0-9]{8}\$[./A-Za-z0-9]{22})
 
   references:
   - https://en.wikipedia.org/wiki/Crypt_(C)#MD5-based_scheme
@@ -20,7 +20,7 @@ rules:
   id: np.pwhash.2
   # Format from Wikipedia:
   #   $2<a/b/x/y>$[cost]$[22 character salt][31 character hash]
-  pattern: '(\$2[abxy]\$\d+\$[./A-Za-z0-9]{53})'
+  pattern: (\$2[abxy]\$\d+\$[./A-Za-z0-9]{53})
 
   references:
   - https://en.wikipedia.org/wiki/Bcrypt
@@ -36,14 +36,7 @@ rules:
 
 - name: Password Hash (sha256crypt)
   id: np.pwhash.3
-  pattern: |
-    (?x)
-    (
-    \$ 5                    (?# magic )
-    (?: \$ rounds=\d+ )?    (?# optional rounds )
-    \$ [./A-Za-z0-9]{8,16}  (?# salt )
-    \$ [./A-Za-z0-9]{43}    (?# hash )
-    )
+  pattern: (\$5(?:\$rounds=\d+)?\$[./A-Za-z0-9]{8,16}\$[./A-Za-z0-9]{43})
 
   references:
   - https://en.wikipedia.org/wiki/Crypt_(C)#Key_derivation_functions_supported_by_crypt
@@ -58,14 +51,7 @@ rules:
 
 - name: Password Hash (sha512crypt)
   id: np.pwhash.4
-  pattern: |
-    (?x)
-    (
-    \$ 6                    (?# magic )
-    (?: \$ rounds=\d+ )?    (?# optional rounds )
-    \$ [./A-Za-z0-9]{8,16}  (?# salt )
-    \$ [./A-Za-z0-9]{86}    (?# hash )
-    )
+  pattern: (\$6(?:\$rounds=\d+)?\$[./A-Za-z0-9]{8,16}\$[./A-Za-z0-9]{86})
 
   references:
   - https://en.wikipedia.org/wiki/Crypt_(C)#Key_derivation_functions_supported_by_crypt
@@ -79,13 +65,7 @@ rules:
 
 - name: Password Hash (Cisco IOS PBKDF2 with SHA256)
   id: np.pwhash.5
-  pattern: |
-    (?x)
-    (
-    \$ 8                    (?# magic )
-    \$ [./A-Za-z0-9]{8,16}  (?# salt )
-    \$ [./A-Za-z0-9]{43}    (?# hash )
-    )
+  pattern: (\$8\$[./A-Za-z0-9]{8,16}\$[./A-Za-z0-9]{43})
 
   references:
   - https://en.wikipedia.org/wiki/Crypt_(C)#Key_derivation_functions_supported_by_crypt

@@ -2,15 +2,7 @@ rules:
 
 - name: Salesforce Access Token
   id: np.salesforce.1
-  pattern: |
-    (?x)
-    \b
-    (
-      00[a-zA-Z0-9]{13}             (?# organization ID )
-      !
-      [a-zA-Z0-9._]{96}             (?# opaque token )
-    )
-    (?: \b | $ | [^a-zA-Z0-9._] )
+  pattern: \b(00[a-zA-Z0-9]{13}![a-zA-Z0-9._]{96})(?:\b|$|[^a-zA-Z0-9._])
 
   references:
   - https://help.salesforce.com/s/articleView?id=sf.remoteaccess_access_tokens.htm&type=5

@@ -11,8 +11,7 @@ rules:
   #   - ApplicationToken
   #
   # Maybe we can generalize this rule one day.
-  pattern: (?i:(?:AccountName|SharedAccessKeyName|SharedSecretIssuer)\s*=\s*([^;]{1,80})\s*;\s*.{0,10}\s*(?:AccountKey|Shared*
-
+  pattern: (?i:(?:AccountName|SharedAccessKeyName|SharedSecretIssuer)\s*=\s*([^;]{1,80})\s*;\s*.{0,10}\s*(?:AccountKey|SharedAccessKey)\s*=\s*([^;]{1,80}))
 
   references:
   - https://azure.microsoft.com/en-us/blog/windows-azure-web-sites-how-application-strings-and-connection-strings-work/
@@ -49,11 +48,7 @@ rules:
 - name: Azure App Configuration Connection String
   id: np.azure.2
 
-  pattern: |
-    (?x)
-    (https://[a-zA-Z0-9-]+\.azconfig\.io);
-    Id=(.{4}-.{2}-.{2}:[a-zA-Z0-9+/]{18,22});
-    Secret=([a-zA-Z0-9+/]{36,50}=)
+  pattern: (https://[a-zA-Z0-9-]+\.azconfig\.io);Id=(.{4}-.{2}-.{2}:[a-zA-Z0-9+/]{18,22});Secret=([a-zA-Z0-9+/]{36,50}=)
 
   examples:
   - 'Endpoint=https://foo-nonprod-appconfig.azconfig.io;Id=ABCD-E6-s0:tl6ABcdefGHi7kLMno/p;Secret=abCD1EF+GHIJxLMnOPqRSa53VWX05zaBCdE/fg9hi4k='
