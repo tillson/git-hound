@@ -1,5 +1,9 @@
 # GitHound
 
+🚀 New in v3.0.0! Try the GitHound Web Dashboard
+Visualize and manage your search results in real-time with the new GitHound dashboard.
+Available now at beta.githoundexplore.com or by using the --dashboard flag.
+
 A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 ![GitHound](assets/logo.png)
@@ -155,9 +159,6 @@ docker run -v /path/to/config.yaml:/root/.githound/config.yaml -v $(pwd)/data:/d
 Replace `/path/to/config.yaml` with the actual path to your `config.yaml` file. The `-v $(pwd)/data:/data` part mounts a directory containing your input files (`subdomains.txt`) into the container.
 
 ---
-
-## Premium Support Options
-Bug fixes and occasional feature enhancements are provided open-source. Technical support and integration requests are available at a rate of 35 USD/hour and can be arranged by contacting tillson@secretsurfer.xyz.
 
 ## References
 
