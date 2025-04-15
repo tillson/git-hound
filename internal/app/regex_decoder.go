@@ -23,10 +23,12 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Create a temporary type to avoid infinite recursion
 	type RuleAlias Rule
 
-	// Create a temporary struct with string pattern
+	// Create a temporary struct with all fields
 	temp := struct {
 		*RuleAlias
 		Pattern string `yaml:"pattern"`
+		Name    string `yaml:"name"`
+		ID      string `yaml:"id"`
 	}{
 		RuleAlias: (*RuleAlias)(r),
 	}
@@ -49,5 +51,7 @@ func (r *Rule) UnmarshalYAML(unmarshal func(interface{}) error) error {
 
 	r.Pattern = compiled
 	r.StringPattern = temp.Pattern
+	r.Description = temp.Name
+	r.ID = temp.ID
 	return nil
 }
