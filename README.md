@@ -24,7 +24,7 @@ More information is available in the [accompanying blog post](https://tillsongal
 
 ## Usage
 
-`echo "\"tillsongalloway.com\"" | git-hound` or `git-hound --subdomain-file subdomains.txt`
+`echo "AKIA" | git-hound` or `git-hound --query "AKIA"`
 
 ## Setup
 
