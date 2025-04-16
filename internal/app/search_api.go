@@ -89,9 +89,7 @@ func SearchWithAPI(queries []string) {
 				fmt.Println(err)
 				resetTime := extractResetTime(err.Error())
 				sleepDuration := resetTime + 3
-				if GetFlags().Debug {
-					color.Yellow("[!] GitHub API limit exceeded. Sleeping for %d seconds...", sleepDuration)
-				}
+				color.Yellow("[!] GitHub API rate limit exceeded. Waiting %d seconds...", sleepDuration)
 				time.Sleep(time.Duration(sleepDuration) * time.Second)
 				backoff = backoff * 1.5
 				if GetFlags().Debug {
