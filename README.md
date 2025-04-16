@@ -94,7 +94,7 @@ Usage:
   --query string          A query string (default: stdin)
   --query-file string     A file containing a list of subdomains (or other queries).
   --results-only          Only print match strings.
-  --rules string          Path to a list of regexes or a GitLeaks rules folder. (default "rules/rules-noseyparker")
+  --rules string          Path to a list of regexes or a GitLeaks rules folder. (default "rules/")
   --search-type api       Search interface (api or `ui`).
   --threads int           Threads to dig with (default 20)
 ```
