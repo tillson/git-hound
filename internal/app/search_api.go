@@ -74,7 +74,6 @@ func SearchWithAPI(queries []string) {
 	rt.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36")
 	http_client.Transport = rt
 
-	backoff := 1.0
 	for _, query := range queries {
 		if GetFlags().Dashboard && InsertKey != "" {
 			BrokerSearchCreation(query)
@@ -91,15 +90,20 @@ func SearchWithAPI(queries []string) {
 				sleepDuration := resetTime + 3
 				color.Yellow("[!] GitHub API rate limit exceeded. Waiting %d seconds...", sleepDuration)
 				time.Sleep(time.Duration(sleepDuration) * time.Second)
-				backoff = backoff * 1.5
 				if GetFlags().Debug {
 					TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d (retry)", query, page))
 				}
 				result, _, err = client.Search.Code(context.Background(), query, &options)
 			}
 
-			backoff = backoff / 1.5
-			backoff = math.Max(1, backoff)
+			// If we get an empty page of results, stop searching
+			if len(result.CodeResults) == 0 {
+				if GetFlags().Debug {
+					fmt.Println("No more results found, stopping search...")
+				}
+				break
+			}
+
 			if !GetFlags().ResultsOnly && !GetFlags().JsonOutput && GetFlags().Debug {
 				fmt.Println("Analyzing " + strconv.Itoa(len(result.CodeResults)) + " repos on page " + strconv.Itoa(page+1) + "...")
 			}

@@ -7,7 +7,7 @@ github_access_token: "API_TOKEN"
 
 
 # WebSocket URL for GitHound Explore (--dashboard)
-websocket_url: "wss://beta.githoundexplore.com/ws"
+websocket_url: "wss://githoundexplore.com/ws"
 
 
 # Deprecated UI search (Use with `--search-type ui` flag)

@@ -4,7 +4,7 @@ A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 
 🚀 New in v3.0.0! Try the GitHound Web Dashboard  
-Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://beta.githoundexplore.com or by using the `--dashboard` flag.
+Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag.
 
 
 
@@ -70,40 +70,33 @@ Check out this [blog post](https://tillsongalloway.com/finding-sensitive-informa
 GitHound makes it easy to find exposed API keys on GitHub using pattern matching, targetted querying, and a robust scoring system.
 ```
 Usage:
-  githound [flags]
-
-Flags:
-      --query string         A query stiing (alternativ, pass through stdin)
-      --config-file string   Supply the path to a config file.
-      --json                 Print results in JSON format
-      --rules string         Path to a list of regexes or a GitLeaks rules folder.
-      -h, --help                 help for githound
-
-      --pages int            Maximum pages to search per query (default 100)
-      --github-repo          Search in a specific Github Repo only.
-      --fast                 Skip file grepping and only return search preview
-      --all-results          Print all results, even if they do not contain secrets
-      --many-results         Search >100 pages with results sorting hack
-
-      --dig-commits          Dig through commit history to find more secrets (CPU intensive).
-      --dig-files            Dig through the repo's files to find more secrets (CPU intensive).
-      --threads int          Threads to dig with (default 20)```
-
-      --results-only         Only print match strings.
-      --search-type api      Search interface (api or `ui`). API requires api_key in config, UI requires username/password
-
-      --otp-code string      Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)
-
-      --query-file string    A file containing a list of subdomains (or other queries).
-      --filtered-only        Only print filtered results (language files)
-      --debug                Enables verbose debug logging.
-  
-      --no-api-keys          Don't search for generic API keys.
-      --no-files             Don't search for interesting files.
-      --no-gists             Don't search Gists
-      --no-keywords          Don't search for built-in keywords
-      --no-repos             Don't search repos
-      --no-scoring           Don't use scoring to filter out false positives.
+  -h, --help                  help for githound
+  --dashboard             Stream results to web dashboard (see https://githoundexplore.com)
+  --all-results           Print all results, even if they do not contain secrets
+  --api-debug             Prints details about GitHub API requests and counts them.
+  --config-file string    Supply the path to a config file.
+  --debug                 Enables verbose debug logging.
+  --dig-commits           Dig through commit history to find more secrets (CPU intensive).
+  --dig-files             Dig through the repo's files to find more secrets (CPU intensive).
+  --fast                  Skip file grepping and only return search preview
+  --json                  Print results in JSON format
+  --many-results          Search >100 pages with filtering hack
+  --no-api-keys           Don't search for generic API keys.
+  --no-files              Don't search for interesting files.
+  --no-gists              Don't search Gists
+  --no-keywords           Don't search for built-in keywords
+  --no-repos              Don't search repos
+  --no-scoring            Don't use scoring to filter out false positives.
+  --otp-code string       Github account 2FA token used for sign-in. (Only use if you have 2FA enabled on your account via authenticator app)
+  --pages int             Maximum pages to search per query (default 100)
+  --profile               Enable pprof profiling on localhost:6060
+  --profile-addr string   Address to serve pprof profiles (default "localhost:6060")
+  --query string          A query string (default: stdin)
+  --query-file string     A file containing a list of subdomains (or other queries).
+  --results-only          Only print match strings.
+  --rules string          Path to a list of regexes or a GitLeaks rules folder. (default "rules/rules-noseyparker")
+  --search-type api       Search interface (api or `ui`).
+  --threads int           Threads to dig with (default 20)
 ```
 
 ## Development

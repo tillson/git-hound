@@ -94,31 +94,18 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 
 	// Rich GitHub search
 	if !GetFlags().NoRepos {
-		if !GetFlags().OnlyFiltered {
-			err = SearchGitHub(query, options, client, &results, resultMap)
-			if err != nil {
-				color.Red("[!] Error searching GitHub for `" + query + "`")
-			}
+		err = SearchGitHub(query, options, client, &results, resultMap)
+		if err != nil {
+			color.Red("[!] Error searching GitHub for `" + query + "`")
 		}
 	}
 
 	// Gist search
 	if !GetFlags().NoGists {
 		resultMap = make(map[string]bool)
-		// if len(languages) > 0 {
-		// 	for _, language := range languages {
-		// 		options.Language = language
-		// 		err = SearchGist(query, options, client, &results, resultMap)
-		// 		if err != nil {
-		// 			color.Red("[!] Error searching Gist for `" + query + "`")
-		// 		}
-		// 	}
-		// }
-		if !GetFlags().OnlyFiltered {
-			err = SearchGist(query, options, client, &results, resultMap)
-			if err != nil {
-				color.Red("[!] Error searching Gist for `" + query + "`")
-			}
+		err = SearchGist(query, options, client, &results, resultMap)
+		if err != nil {
+			color.Red("[!] Error searching Gist for `" + query + "`")
 		}
 	}
 	return results, err
@@ -126,13 +113,7 @@ func Search(query string, client *http.Client) (results []RepoSearchResult, err 
 
 // SearchGitHub searches GitHub code results for the given query
 func SearchGitHub(query string, options SearchOptions, client *http.Client, results *[]RepoSearchResult, resultSet map[string]bool) (err error) {
-	base := ""
-	if GetFlags().GithubRepo {
-		base = "https://github.com/" + query + "/search"
-	} else {
-		base = "https://github.com/search"
-	}
-	// fmt.Println(base)
+	base := "https://github.com/search"
 	page, pages := 0, 1
 	var delay = 5
 	orders := []string{"asc"}

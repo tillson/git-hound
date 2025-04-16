@@ -9,13 +9,11 @@ type Flags struct {
 	RegexFile       string
 	ConfigFile      string
 	Pages           int
-	GithubRepo      bool
 	ResultsOnly     bool
 	NoAPIKeys       bool
 	NoScoring       bool
 	NoFiles         bool
 	NoKeywords      bool
-	OnlyFiltered    bool
 	AllResults      bool
 	FastMode        bool
 	Threads         int
