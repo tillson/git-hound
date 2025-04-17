@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -54,7 +53,10 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		base := GetRawURLForSearchResult(repo)
 		data, err := DownloadRawFile(client, base, repo)
 		if err != nil {
-			log.Fatal(err)
+			if GetFlags().Debug {
+				fmt.Printf("Error downloading %s: %v\n", repo.Raw, err)
+			}
+			return // Skip this file and continue with others
 		}
 		repo.Contents = string(data)
 	}

@@ -151,8 +151,16 @@ func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchRe
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Construct the full URL
-	fullURL := base + "/" + searchResult.Raw
+	// Split the path and encode each component
+	pathParts := strings.Split(searchResult.Raw, "/")
+	encodedParts := make([]string, len(pathParts))
+	for i, part := range pathParts {
+		encodedParts[i] = url.PathEscape(part)
+	}
+	encodedPath := strings.Join(encodedParts, "/")
+
+	// Construct the full URL with encoded path
+	fullURL := base + "/" + encodedPath
 
 	// Create a request with the timeout context
 	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
@@ -171,6 +179,7 @@ func DownloadRawFile(client *http.Client, base string, searchResult RepoSearchRe
 
 	// Check response code
 	if resp.StatusCode >= 400 {
+		fmt.Println(fullURL)
 		return []byte{}, fmt.Errorf("HTTP error: %d", resp.StatusCode)
 	}
 
