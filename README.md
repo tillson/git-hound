@@ -32,6 +32,14 @@ More information is available in the [accompanying blog post](https://tillsongal
 2. Make sure an API key is set in `config.yml`
 4. Run `./git-hound` to test (make sure you're in the correct directory!)
 
+**Configuration:**
+
+GitHound primarily uses `config.yml` (located in the current directory or `$HOME/.githound/`) for configuration. See `config.example.yml` for an example.
+
+Alternatively, you can use environment variables, which will override values in `config.yml`:
+- `GITHOUND_GITHUB_TOKEN`: Sets the GitHub API access token.
+- `GITHOUND_INSERT_KEY`: Sets the GitHoundExplore Insert Key for the `--dashboard` feature.
+
 ### Two-Factor Authentication
 
 If GitHound is logged into your GitHub account, two-factor authentication may kick in. You can pass 2FA codes to GitHound with `--otp-code`.

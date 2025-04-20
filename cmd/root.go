@@ -314,13 +314,14 @@ func Execute() {
 
 // ReadConfig initializes Viper, the config parser
 func ReadConfig() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath("$HOME/.githound")
-	viper.AddConfigPath(".")
+	viperext := viper.New()
+	viperext.SetConfigName("config")
+	viperext.AddConfigPath("$HOME/.githound")
+	viperext.AddConfigPath(".")
 	if app.GetFlags().ConfigFile != "" {
-		viper.SetConfigFile(app.GetFlags().ConfigFile)
+		viperext.SetConfigFile(app.GetFlags().ConfigFile)
 	}
-	err := viper.ReadInConfig()
+	err := viperext.ReadInConfig()
 	if err != nil {
 		if app.GetFlags().ConfigFile != "" {
 			color.Red("[!] Config file '" + app.GetFlags().ConfigFile + "' was not found. Please specify a correct config path with `--config-file`.")
@@ -332,7 +333,21 @@ func ReadConfig() {
 	}
 
 	// Read WebSocket URL from config
-	app.GetFlags().WebSocketURL = viper.GetString("websocket_url")
+	app.GetFlags().WebSocketURL = viperext.GetString("websocket_url")
+
+	// Read GitHub token: env var overrides config
+	githubToken := viperext.GetString("github_access_token")
+	if envToken := os.Getenv("GITHOUND_GITHUB_TOKEN"); envToken != "" {
+		githubToken = envToken
+	}
+	app.GetFlags().GithubAccessToken = githubToken
+
+	// Read Insert Key: env var overrides config (assuming key 'insert_key' in config)
+	insertKey := viperext.GetString("insert_key") // Assuming 'insert_key' is the config key name
+	if envInsertKey := os.Getenv("GITHOUND_INSERT_KEY"); envInsertKey != "" {
+		insertKey = envInsertKey
+	}
+	app.GetFlags().InsertKey = insertKey
 }
 
 // StartPprofServer starts the pprof HTTP server for profiling

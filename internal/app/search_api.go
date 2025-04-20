@@ -14,7 +14,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/v57/github"
-	"github.com/spf13/viper"
 )
 
 // Semaphore to limit concurrent HTTP requests
@@ -35,9 +34,9 @@ func SearchWithAPI(queries []string) {
 	// Initialize HTTP request limiter
 	initHTTPSemaphore()
 
-	token := viper.GetString("github_access_token")
+	token := GetFlags().GithubAccessToken
 	if token == "" {
-		color.Red("[!] GitHub access token not found. Please set it using --token or in your config file.")
+		color.Red("[!] GitHub access token not found. Please set it using GITHOUND_GITHUB_TOKEN environment variable or in your config file.")
 		os.Exit(1)
 	}
 
@@ -75,7 +74,7 @@ func SearchWithAPI(queries []string) {
 	http_client.Transport = rt
 
 	for _, query := range queries {
-		if GetFlags().Dashboard && InsertKey != "" {
+		if GetFlags().Dashboard && GetFlags().InsertKey != "" {
 			BrokerSearchCreation(query)
 		}
 		for page := 0; page < int(math.Min(10, float64(GetFlags().Pages))); page++ {

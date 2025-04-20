@@ -13,7 +13,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/google/go-github/v57/github"
-	"github.com/spf13/viper"
 )
 
 // ResultScan is the final scan result.
@@ -112,7 +111,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 		// Process and display matches
 		if len(matches) > 0 {
 			// Fetch GitHub API info about the repo
-			token := viper.GetString("github_access_token")
+			token := GetFlags().GithubAccessToken
 			client := github.NewClient(nil).WithAuthToken(token)
 			if client != nil {
 				// gh_repo_obj, _, err := client.Repositories.Get(strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1])
@@ -177,10 +176,10 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 						color.New(color.Faint).Println(GetResultLink(repo, result))
 					}
 				}
-				if GetFlags().Dashboard && InsertKey != "" {
+				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
 					resultJSON, err := json.Marshal(resultPayload)
 					if err == nil {
-						SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, InsertKey, string(resultJSON)))
+						SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
 					} else {
 						color.Red("Error marshalling result to JSON: %v", err)
 					}
