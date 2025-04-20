@@ -179,7 +179,12 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
 					resultJSON, err := json.Marshal(resultPayload)
 					if err == nil {
-						SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+						searchID := GetFlags().SearchID
+						if searchID != "" {
+							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+						} else {
+							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+						}
 					} else {
 						color.Red("Error marshalling result to JSON: %v", err)
 					}

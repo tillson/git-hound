@@ -230,6 +230,12 @@ func BrokerSearchCreation(query string) {
 		return
 	}
 
+	// Skip start_search if in dashboard mode with search ID
+	if GetFlags().Dashboard && GetFlags().SearchID != "" {
+		color.Green("Connected to GitHound Explore! Using existing search ID: %s", GetFlags().SearchID)
+		return
+	}
+
 	// Now send the search query
 	escapedQuery, err := json.Marshal(query)
 	if err != nil {

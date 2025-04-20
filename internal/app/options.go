@@ -4,6 +4,7 @@ package app
 type Flags struct {
 	QueryFile         string
 	Query             string
+	SearchID          string
 	DigRepo           bool
 	DigCommits        bool
 	RegexFile         string

@@ -29,6 +29,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SearchType, "search-type", "", "Search interface (`api` or `ui`).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().QueryFile, "query-file", "", "A file containing a list of subdomains (or other queries).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().Query, "query", "", "A query string (default: stdin)")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().SearchID, "search-id", "", "Search ID for dashboard mode (skips start_search step)")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigRepo, "dig-files", false, "Dig through the repo's files to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().DigCommits, "dig-commits", false, "Dig through commit history to find more secrets (CPU intensive).")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().RegexFile, "rules", "rules/", "Path to a list of regexes or a GitLeaks rules folder.")
