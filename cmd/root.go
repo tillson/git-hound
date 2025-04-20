@@ -321,33 +321,60 @@ func ReadConfig() {
 	if app.GetFlags().ConfigFile != "" {
 		viperext.SetConfigFile(app.GetFlags().ConfigFile)
 	}
-	err := viperext.ReadInConfig()
-	if err != nil {
-		if app.GetFlags().ConfigFile != "" {
-			color.Red("[!] Config file '" + app.GetFlags().ConfigFile + "' was not found. Please specify a correct config path with `--config-file`.")
-		} else {
-			color.Red("[!] config.yml was not found. Please ensure config.yml exists in current working directory or $HOME/.githound/, or use flag `--config [config_path]`.")
-		}
-		os.Exit(1)
-		return
-	}
 
-	// Read WebSocket URL from config
+	// Try reading the config file, but don't exit immediately on error
+	configReadErr := viperext.ReadInConfig()
+
+	// Read WebSocket URL from config (best effort)
 	app.GetFlags().WebSocketURL = viperext.GetString("websocket_url")
 
-	// Read GitHub token: env var overrides config
+	// Read GitHub token from config (if available)
 	githubToken := viperext.GetString("github_access_token")
+	// Override with environment variable if set
 	if envToken := os.Getenv("GITHOUND_GITHUB_TOKEN"); envToken != "" {
 		githubToken = envToken
 	}
 	app.GetFlags().GithubAccessToken = githubToken
 
-	// Read Insert Key: env var overrides config (assuming key 'insert_key' in config)
-	insertKey := viperext.GetString("insert_key") // Assuming 'insert_key' is the config key name
+	// Read Insert Key from config (if available)
+	insertKey := viperext.GetString("insert_key")
+	// Override with environment variable if set
 	if envInsertKey := os.Getenv("GITHOUND_INSERT_KEY"); envInsertKey != "" {
 		insertKey = envInsertKey
 	}
 	app.GetFlags().InsertKey = insertKey
+
+	// Now, check if the essential GitHub token is present
+	if app.GetFlags().GithubAccessToken == "" {
+		// Token is missing. Explain why and exit.
+		if configReadErr != nil {
+			if app.GetFlags().ConfigFile != "" {
+				// Config file was specified but not found/readable
+				color.Red("[!] Config file '%s' could not be read: %v", app.GetFlags().ConfigFile, configReadErr)
+			} else {
+				// Default config file locations not found/readable
+				color.Red("[!] Default config file (config.yml in . or $HOME/.githound) could not be read: %v", configReadErr)
+			}
+			color.Red("[!] GitHub token also not found in GITHOUND_GITHUB_TOKEN environment variable.")
+		} else {
+			// Config file was read successfully, but token was missing
+			color.Red("[!] GitHub token not found in config file ('github_access_token') or GITHOUND_GITHUB_TOKEN environment variable.")
+		}
+		color.Red("[!] A GitHub token is required to run GitHound.")
+		os.Exit(1)
+		return
+	}
+
+	// Handle dashboard-specific configuration
+	if app.GetFlags().Dashboard {
+		if app.GetFlags().InsertKey == "" {
+			color.Yellow("[!] Dashboard mode enabled, but Insert Key is missing.")
+			color.Yellow("[!] Set the key via GITHOUND_INSERT_KEY environment variable or in config.yml ('insert_key').")
+			color.Yellow("[!] Without an Insert Key, results will not be sent to the web dashboard.")
+		} else {
+			color.Green("[+] Dashboard mode enabled with Insert Key.")
+		}
+	}
 }
 
 // StartPprofServer starts the pprof HTTP server for profiling

@@ -43,9 +43,16 @@ func StartWebSocket(url string) {
 		}
 	}()
 
+	// Use Insert Key from environment variable if available
+	if GetFlags().InsertKey != "" {
+		InsertKey = GetFlags().InsertKey
+		return
+	}
+
+	// Fall back to reading from token file
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		color.Red("Error accessing GitHound cache directory at ~/.githound: %v", err)
+		color.Red("Error getting home directory: %v", err)
 		time.Sleep(5 * time.Second)
 		return
 	}
@@ -92,7 +99,6 @@ func StartWebSocket(url string) {
 				ConnectToAccount(response)
 			}
 		}
-
 	} else {
 		payload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0"}`)
 		err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
@@ -197,6 +203,34 @@ func BrokerSearchCreation(query string) {
 		return
 	}
 
+	// First send the insert key to authenticate
+	authPayload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, InsertKey)
+	err := wsConn.WriteMessage(websocket.TextMessage, []byte(authPayload))
+	if err != nil {
+		color.Red("Error sending authentication message: %v", err)
+		return
+	}
+
+	// Wait for authentication response
+	_, message, err := wsConn.ReadMessage()
+	if err != nil {
+		color.Red("Error reading authentication response: %v", err)
+		return
+	}
+
+	var authResponse map[string]interface{}
+	err = json.Unmarshal(message, &authResponse)
+	if err != nil {
+		color.Red("Error unmarshalling authentication response: %v", err)
+		return
+	}
+
+	if loggedIn, ok := authResponse["logged_in"].(bool); !ok || !loggedIn {
+		color.Red("Error authenticating with insert key")
+		return
+	}
+
+	// Now send the search query
 	escapedQuery, err := json.Marshal(query)
 	if err != nil {
 		color.Red("Error escaping search query")
@@ -205,29 +239,27 @@ func BrokerSearchCreation(query string) {
 	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, InsertKey, escapedQuery)
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
-		color.Red("Error sending WebSocket message: %v", err)
+		color.Red("Error sending search message: %v", err)
 		return
 	}
 
-	_, message, err := wsConn.ReadMessage()
+	_, message, err = wsConn.ReadMessage()
 	if err != nil {
-		color.Red("Error reading WebSocket message: %v", err)
+		color.Red("Error reading search response: %v", err)
 		return
 	}
 
 	var response map[string]interface{}
 	err = json.Unmarshal(message, &response)
 	if err != nil {
-		color.Red("Error unmarshalling WebSocket message: %v", err)
+		color.Red("Error unmarshalling search response: %v", err)
 		return
 	}
 
 	if event, ok := response["event"].(string); ok && event == "search_ack" {
 		if _, ok := response["searchID"].(string); ok {
-			// color.Green("Search started successfully with ID: %s", searchID)
 			if url, ok := response["url"].(string); ok {
 				color.Green("Connected to GitHound Explore! View search results at: %s", url)
-				time.Sleep(2 * time.Second)
 			}
 		}
 	} else if errorMsg, ok := response["error"].(string); ok {
