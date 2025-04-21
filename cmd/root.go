@@ -60,84 +60,6 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Trufflehog, "trufflehog", false, "Ingest trufflehog output without scanning")
 }
 
-func handleTrufflehogInput() {
-	if !app.GetFlags().Dashboard {
-		color.Red("[!] Trufflehog mode requires --dashboard flag to be set")
-		os.Exit(1)
-	}
-
-	if app.GetFlags().InsertKey == "" {
-		color.Red("[!] Trufflehog mode requires an Insert Key to be set")
-		os.Exit(1)
-	}
-
-	// Start WebSocket connection
-	app.StartWebSocket(app.GetFlags().WebSocketURL)
-
-	// Wait a moment for WebSocket to connect
-	time.Sleep(1 * time.Second)
-
-	// Start a new search session
-	if app.GetFlags().SearchID == "" {
-		app.BrokerSearchCreation("TruffleHog Search")
-	} else {
-		color.Green("[+] Using existing search ID: %s", app.GetFlags().SearchID)
-	}
-
-	if app.GetFlags().Debug {
-		color.Cyan("[*] Reading trufflehog output from stdin...")
-	}
-
-	// Read from stdin
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-
-		if app.GetFlags().Debug {
-			color.Cyan("[*] Received line: %s", line)
-		}
-
-		// Parse trufflehog JSON output
-		var result map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &result); err != nil {
-			if app.GetFlags().Debug {
-				color.Yellow("[!] Failed to parse trufflehog output: %v", err)
-			}
-			continue
-		}
-
-		// Add insert key and search ID to the message
-		result["insertToken"] = app.GetFlags().InsertKey
-		result["event"] = "trufflehog_result"
-		if app.GetFlags().SearchID != "" {
-			result["searchID"] = app.GetFlags().SearchID
-		}
-
-		// Convert back to JSON
-		jsonData, err := json.Marshal(result)
-		if err != nil {
-			if app.GetFlags().Debug {
-				color.Yellow("[!] Failed to marshal trufflehog output: %v", err)
-			}
-			continue
-		}
-
-		// Send to WebSocket
-		app.SendToWebSocket(string(jsonData))
-		if app.GetFlags().Debug {
-			color.Green("[+] Sent message to WebSocket")
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		color.Red("[!] Error reading trufflehog output: %v", err)
-		os.Exit(1)
-	}
-}
-
 var rootCmd = &cobra.Command{
 	Use:   "githound",
 	Short: "GitHound is a pattern-matching, batch-catching secret snatcher.",
@@ -160,15 +82,120 @@ var rootCmd = &cobra.Command{
 			app.ClearRepoStorage()
 		}
 
-		// Handle trufflehog mode
-		if app.GetFlags().Trufflehog {
-			handleTrufflehogInput()
-			return
+		// fmt.Println(123)
+		// Handle dashboard mode
+		if app.GetFlags().Dashboard {
+			// First try to read the insert key from file
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				color.Red("Error getting home directory: %v", err)
+				os.Exit(1)
+			}
+			tokenFilePath := filepath.Join(homeDir, ".githound", "insert_token.txt")
+
+			// If insert key is not already set, try to read it from file
+			if app.GetFlags().InsertKey == "" {
+				if _, err := os.Stat(tokenFilePath); err == nil {
+					// Token file exists, read it
+					tokenBytes, err := ioutil.ReadFile(tokenFilePath)
+
+					if err == nil {
+						app.GetFlags().InsertKey = strings.TrimSpace(string(tokenBytes))
+					}
+				}
+			}
+			fmt.Println(app.GetFlags().InsertKey)
+			// If we still don't have an insert key, start the WebSocket connection to get one
+			if app.GetFlags().InsertKey == "" {
+				color.Cyan("[*] Starting dashboard mode...")
+				app.StartWebSocket(app.GetFlags().WebSocketURL)
+			} else {
+				color.Green("[+] Dashboard mode enabled with Insert Key.")
+			}
 		}
 
-		// Start WebSocket if in dashboard mode (but not in trufflehog mode)
-		if app.GetFlags().Dashboard {
+		// Handle trufflehog mode
+		if app.GetFlags().Trufflehog {
+			if !app.GetFlags().Dashboard {
+				color.Red("[!] Trufflehog mode requires --dashboard flag to be set")
+				os.Exit(1)
+			}
+
+			if app.GetFlags().InsertKey == "" {
+				color.Red("[!] Trufflehog mode requires an Insert Key to be set")
+				os.Exit(1)
+			}
+
+			// Initialize WebSocket connection
 			app.StartWebSocket(app.GetFlags().WebSocketURL)
+
+			// Start a new search session
+			if app.GetFlags().SearchID == "" {
+				app.BrokerSearchCreation("TruffleHog Search")
+			} else {
+				color.Green("[+] Using existing search ID: %s", app.GetFlags().SearchID)
+			}
+
+			color.Cyan("[*] Waiting for trufflehog output from stdin...")
+			color.Cyan("[*] Example usage: trufflehog git <repo-url> --json | go run main.go --trufflehog --dashboard")
+
+			// Start a goroutine to read from stdin
+			go func() {
+				scanner := bufio.NewScanner(os.Stdin)
+				for scanner.Scan() {
+					line := scanner.Text()
+					if line == "" {
+						continue
+					}
+
+					if app.GetFlags().Debug {
+						color.Cyan("[*] Received line: %s", line)
+					}
+
+					// Parse trufflehog JSON output
+					var result map[string]interface{}
+					if err := json.Unmarshal([]byte(line), &result); err != nil {
+						if app.GetFlags().Debug {
+							color.Yellow("[!] Failed to parse trufflehog output: %v", err)
+						}
+						continue
+					}
+
+					// Add insert key and search ID to the message
+					result["insertToken"] = app.GetFlags().InsertKey
+					result["event"] = "trufflehog_result"
+					if app.GetFlags().SearchID != "" {
+						result["searchID"] = app.GetFlags().SearchID
+					}
+
+					// Convert back to JSON
+					jsonData, err := json.Marshal(result)
+					if err != nil {
+						if app.GetFlags().Debug {
+							color.Yellow("[!] Failed to marshal trufflehog output: %v", err)
+						}
+						continue
+					}
+
+					// Send to WebSocket
+					app.SendToWebSocket(string(jsonData))
+					if app.GetFlags().Debug {
+						color.Green("[+] Sent message to WebSocket")
+					}
+				}
+
+				if err := scanner.Err(); err != nil {
+					color.Red("[!] Error reading trufflehog output: %v", err)
+					os.Exit(1)
+				}
+
+				// When scanner.Scan() returns false and there's no error, stdin is closed
+				color.Green("[+] Finished processing trufflehog output")
+				os.Exit(0)
+			}()
+
+			// Wait indefinitely for input
+			select {}
 		}
 
 		var queries []string
@@ -196,22 +223,44 @@ var rootCmd = &cobra.Command{
 		if len(queries) == 0 {
 			if app.GetFlags().Dashboard {
 				color.Red("[!] No search queries specified.")
-				color.Blue("[*] Please enter a query:")
+				color.Blue("[*] Please choose an option:")
+				color.Blue("1) Run a GitHub code search secret scan with GitHound")
+				color.Blue("2) Upload results from TruffleHog into the dashboard")
+				fmt.Print("Enter your choice (1 or 2): ")
+
 				scanner := bufio.NewScanner(os.Stdin)
 				for scanner.Scan() {
-					query := scanner.Text()
-					if query != "" {
-						queries = append(queries, query)
+					choice := scanner.Text()
+					if choice == "1" {
+						color.Blue("[*] Please enter your search query:")
+						for scanner.Scan() {
+							query := scanner.Text()
+							if query != "" {
+								queries = append(queries, query)
+								break
+							}
+						}
+						fmt.Println("In the future, you can run this command with the query specified:")
+						fmt.Println("echo \"your_query\" | githound --dashboard")
 						break
+					} else if choice == "2" {
+						color.Cyan("\nTo upload TruffleHog results to the dashboard:")
+						color.Cyan("1. Run TruffleHog with the --json flag")
+						color.Cyan("2. Pipe the output into GitHound with the --trufflehog flag")
+						color.Cyan("\nExample:")
+						color.Cyan("trufflehog git <repo-url> --json | githound --dashboard --trufflehog")
+						color.Cyan("\nPlease re-run the command with the --trufflehog flag.")
+						os.Exit(0)
+					} else {
+						color.Red("[!] Invalid choice. Please enter 1 or 2:")
+						continue
 					}
 				}
-				fmt.Println("In the future, you can run this command with the query specified:")
-				fmt.Println("echo \"your_query\" | githound --dashboard")
-			} else {
-				color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
-				os.Exit(1)
-				return
 			}
+		} else {
+			color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
+			os.Exit(1)
+			return
 		}
 
 		var allRules []app.Rule
@@ -416,6 +465,9 @@ func ReadConfig() {
 
 	// Read WebSocket URL from config (best effort)
 	app.GetFlags().WebSocketURL = viperext.GetString("websocket_url")
+	if app.GetFlags().WebSocketURL == "" {
+		app.GetFlags().WebSocketURL = "wss://githoundexplore.com/ws"
+	}
 
 	// Read GitHub token from config (if available)
 	githubToken := viperext.GetString("github_access_token")
@@ -431,10 +483,63 @@ func ReadConfig() {
 	if envInsertKey := os.Getenv("GITHOUND_INSERT_KEY"); envInsertKey != "" {
 		insertKey = envInsertKey
 	}
+
+	// Check for insert_key.txt in ~/.githound
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		insertKeyPath := filepath.Join(homeDir, ".githound", "insert_key.txt")
+		if keyBytes, err := ioutil.ReadFile(insertKeyPath); err == nil {
+			insertKey = strings.TrimSpace(string(keyBytes))
+		}
+	}
+
 	app.GetFlags().InsertKey = insertKey
 
+	// Handle dashboard-specific configuration first
+	if app.GetFlags().Dashboard {
+		if app.GetFlags().InsertKey == "" {
+			// color.Cyan("[*] Starting dashboard mode...")
+			// Start WebSocket connection - this will handle the account linking process
+			// app.StartWebSocket(app.GetFlags().WebSocketURL)
+
+			// Wait for the Insert Key to be set with timeout
+			timeout := time.After(30 * time.Second)
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					// Check if token file exists
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						color.Red("Error getting home directory: %v", err)
+						continue
+					}
+					tokenFilePath := filepath.Join(homeDir, ".githound", "insert_token.txt")
+					if _, err := os.Stat(tokenFilePath); err == nil {
+						// Token file exists, read it
+						tokenBytes, err := ioutil.ReadFile(tokenFilePath)
+						if err == nil {
+							app.GetFlags().InsertKey = string(tokenBytes)
+							// color.Green("[+] Dashboard mode enabled with Insert Key.")
+							return
+						}
+					}
+				case <-timeout:
+					color.Red("[!] Timeout waiting for account linking. Please try again.")
+					os.Exit(1)
+				}
+			}
+		} else {
+			color.Green("[+] Dashboard mode enabled with Insert Key.")
+		}
+		return // Exit early for dashboard mode - no need to check GitHub token
+	}
+
 	// Now, check if the essential GitHub token is present
-	if app.GetFlags().GithubAccessToken == "" {
+	// Skip this check if in trufflehog mode
+	if !app.GetFlags().Trufflehog && app.GetFlags().GithubAccessToken == "" {
 		// Token is missing. Explain why and exit.
 		if configReadErr != nil {
 			if app.GetFlags().ConfigFile != "" {
@@ -452,17 +557,6 @@ func ReadConfig() {
 		color.Red("[!] A GitHub token is required to run GitHound.")
 		os.Exit(1)
 		return
-	}
-
-	// Handle dashboard-specific configuration
-	if app.GetFlags().Dashboard {
-		if app.GetFlags().InsertKey == "" {
-			color.Yellow("[!] Dashboard mode enabled, but Insert Key is missing.")
-			color.Yellow("[!] Set the key via GITHOUND_INSERT_KEY environment variable or in config.yml ('insert_key').")
-			color.Yellow("[!] Without an Insert Key, results will not be sent to the web dashboard.")
-		} else {
-			color.Green("[+] Dashboard mode enabled with Insert Key.")
-		}
 	}
 }
 

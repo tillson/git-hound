@@ -15,7 +15,8 @@ import (
 
 var wsConn *websocket.Conn
 var wsMessageChannel chan string
-var InsertKey string // Global variable for InsertKey
+
+// var InsertKey string // Global variable for InsertKey
 
 func StartWebSocket(url string) {
 	dialer := websocket.Dialer{
@@ -31,6 +32,145 @@ func StartWebSocket(url string) {
 	}
 	wsMessageChannel = make(chan string)
 
+	// Send initial message to start account linking
+	var payload string
+	if GetFlags().InsertKey != "" {
+		payload = fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, GetFlags().InsertKey)
+	} else {
+		payload = fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0"}`)
+	}
+	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
+	if err != nil {
+		color.Red("Error sending WebSocket message: %v", err)
+		return
+	}
+
+	// Handle initial response synchronously
+	_, message, err := wsConn.ReadMessage()
+	if err != nil {
+		color.Red("Error reading initial WebSocket message: %v", err)
+		return
+	}
+
+	var response map[string]interface{}
+	err = json.Unmarshal(message, &response)
+	if err != nil {
+		color.Red("Error unmarshalling initial WebSocket message: %v", err)
+		return
+	}
+
+	// If we have an insert token and the server confirms we're logged in, we're done
+	if GetFlags().InsertKey != "" {
+		if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
+			color.Green("[+] WebSocket connection established")
+
+			// If in trufflehog mode, send start_search message
+			if GetFlags().Trufflehog {
+				escapedQuery, err := json.Marshal("TruffleHog Search")
+				if err != nil {
+					color.Red("Error escaping search query")
+					return
+				}
+				payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
+				err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
+				if err != nil {
+					color.Red("Error sending search message: %v", err)
+					return
+				}
+
+				// Wait for search_ack response
+				_, message, err := wsConn.ReadMessage()
+				if err != nil {
+					color.Red("Error reading search response: %v", err)
+					return
+				}
+
+				var searchResponse map[string]interface{}
+				err = json.Unmarshal(message, &searchResponse)
+				if err != nil {
+					color.Red("Error unmarshalling search response: %v", err)
+					return
+				}
+
+				if event, ok := searchResponse["event"].(string); ok && event == "search_ack" {
+					if searchID, ok := searchResponse["searchID"].(string); ok {
+						GetFlags().SearchID = searchID
+						if url, ok := searchResponse["url"].(string); ok {
+							color.Green("Connected to GitHound Explore! View search results at: %s", url)
+						}
+					}
+				} else if errorMsg, ok := searchResponse["error"].(string); ok {
+					color.Red("Error starting search: %s", errorMsg)
+				}
+			}
+		} else {
+			color.Red("[!] Invalid insert token")
+			return
+		}
+	} else {
+		// Handle account linking URL
+		if url, ok := response["url"].(string); ok {
+			color.Cyan("Please visit the following URL to link your account: %s", url)
+			color.Cyan("Waiting for verification...")
+		}
+	}
+
+	// Start a goroutine to handle incoming messages
+	go func() {
+		defer wsConn.Close()
+		for {
+			_, message, err := wsConn.ReadMessage()
+			if err != nil {
+				color.Red("Error reading WebSocket message: %v", err)
+				return
+			}
+
+			var response map[string]interface{}
+			err = json.Unmarshal(message, &response)
+			if err != nil {
+				color.Red("Error unmarshalling WebSocket message: %v", err)
+				continue
+			}
+
+			// Handle successful account linking
+			if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
+				if insertToken, ok := response["insert_token"].(string); ok {
+					GetFlags().InsertKey = insertToken
+
+					// Save the token to file
+					homeDir, err := os.UserHomeDir()
+					if err != nil {
+						color.Red("Error getting home directory: %v", err)
+						continue
+					}
+
+					gitHoundDir := filepath.Join(homeDir, ".githound")
+					tokenFilePath := filepath.Join(gitHoundDir, "insert_token.txt")
+
+					// Create the .githound directory if it doesn't exist
+					if _, err := os.Stat(gitHoundDir); os.IsNotExist(err) {
+						err = os.MkdirAll(gitHoundDir, 0700)
+						if err != nil {
+							color.Red("Error creating .githound directory: %v", err)
+							continue
+						}
+					}
+
+					// Save the token to the file
+					err = ioutil.WriteFile(tokenFilePath, []byte(insertToken), 0600)
+					if err != nil {
+						color.Red("Error writing token file: %v", err)
+						continue
+					}
+
+					color.Green("[+] Account linked successfully!")
+					color.Green("[+] Token saved to %s", tokenFilePath)
+				}
+			}
+		}
+	}()
+
+	// Start a goroutine to handle outgoing messages
 	go func() {
 		defer wsConn.Close()
 		for {
@@ -42,81 +182,6 @@ func StartWebSocket(url string) {
 			}
 		}
 	}()
-
-	// Use Insert Key from environment variable if available
-	if GetFlags().InsertKey != "" {
-		InsertKey = GetFlags().InsertKey
-		return
-	}
-
-	// Fall back to reading from token file
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		color.Red("Error getting home directory: %v", err)
-		time.Sleep(5 * time.Second)
-		return
-	}
-
-	gitHoundDir := filepath.Join(homeDir, ".githound")
-	tokenFilePath := filepath.Join(gitHoundDir, "insert_token.txt")
-
-	var token string
-	if _, err := os.Stat(tokenFilePath); err == nil {
-		// Token file exists, load the token
-		tokenBytes, err := ioutil.ReadFile(tokenFilePath)
-		if err != nil {
-			color.Red("Error accessing cached GitHound token at ~/.githound/insert_token.txt: %v", err)
-			time.Sleep(5 * time.Second)
-			return
-		}
-		token = string(tokenBytes)
-
-		// Send the token to the WebSocket
-		payload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, token)
-		err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
-		if err != nil {
-			color.Red("Error sending WebSocket message: %v", err)
-			log.Fatal(err)
-		}
-		for {
-			_, message, err := wsConn.ReadMessage()
-			if err != nil {
-				color.Red("Error reading WebSocket message: %v", err)
-				fmt.Println(message)
-				log.Fatal(err)
-			}
-
-			var response map[string]interface{}
-			err = json.Unmarshal(message, &response)
-			if err != nil {
-				color.Red("Error unmarshalling WebSocket message: %v", err)
-				log.Fatal(err)
-			}
-
-			if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
-				break
-			} else {
-				ConnectToAccount(response)
-			}
-		}
-	} else {
-		payload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0"}`)
-		err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
-		if err != nil {
-			color.Red("Error sending WebSocket message: %v", err)
-			log.Fatal(err)
-		}
-		_, message, err := wsConn.ReadMessage()
-		if err != nil {
-			color.Red("Error reading WebSocket message: %v", err)
-			log.Fatal(err)
-		}
-
-		var response map[string]interface{}
-		_ = json.Unmarshal(message, &response)
-		token = ConnectToAccount(response)
-	}
-	InsertKey = token
 }
 
 func ConnectToAccount(response map[string]interface{}) string {
@@ -141,6 +206,7 @@ func ConnectToAccount(response map[string]interface{}) string {
 		}
 
 		if loggedIn, ok := response["logged_in"].(bool); ok && !loggedIn {
+			fmt.Println("login failed")
 			if url, ok := response["url"].(string); ok {
 				color.Cyan("Please visit the following URL to link your account: %s", url)
 				color.Cyan("Waiting for verification...")
@@ -213,7 +279,7 @@ func BrokerSearchCreation(query string) {
 	}
 
 	// First send the insert key to authenticate
-	authPayload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, InsertKey)
+	authPayload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, GetFlags().InsertKey)
 	err := wsConn.WriteMessage(websocket.TextMessage, []byte(authPayload))
 	if err != nil {
 		color.Red("Error sending authentication message: %v", err)
@@ -251,7 +317,7 @@ func BrokerSearchCreation(query string) {
 		color.Red("Error escaping search query")
 		return
 	}
-	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, InsertKey, escapedQuery)
+	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending search message: %v", err)
