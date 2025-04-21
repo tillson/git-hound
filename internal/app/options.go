@@ -33,6 +33,7 @@ type Flags struct {
 	ProfileAddr       string // Address to serve pprof profiles (host:port)
 	GithubAccessToken string // GitHub API token
 	InsertKey         string // GitHoundExplore Insert Key
+	Trufflehog        bool   // Ingest trufflehog output without scanning
 }
 
 var flags Flags

@@ -197,6 +197,15 @@ func SendMessageToWebSocket(message string) {
 	}
 }
 
+// SendToWebSocket sends a message to the WebSocket connection
+func SendToWebSocket(message string) {
+	if wsMessageChannel != nil {
+		wsMessageChannel <- message
+	} else {
+		color.Yellow("[!] WebSocket not initialized")
+	}
+}
+
 func BrokerSearchCreation(query string) {
 	if wsConn == nil {
 		color.Red("WebSocket connection is not established")

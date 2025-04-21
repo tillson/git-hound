@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/viper"
@@ -55,6 +57,85 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Dashboard, "dashboard", false, "Stream results to GitHoundExplore.com")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().EnableProfiling, "profile", false, "Enable pprof profiling on localhost:6060")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ProfileAddr, "profile-addr", "localhost:6060", "Address to serve pprof profiles")
+	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Trufflehog, "trufflehog", false, "Ingest trufflehog output without scanning")
+}
+
+func handleTrufflehogInput() {
+	if !app.GetFlags().Dashboard {
+		color.Red("[!] Trufflehog mode requires --dashboard flag to be set")
+		os.Exit(1)
+	}
+
+	if app.GetFlags().InsertKey == "" {
+		color.Red("[!] Trufflehog mode requires an Insert Key to be set")
+		os.Exit(1)
+	}
+
+	// Start WebSocket connection
+	app.StartWebSocket(app.GetFlags().WebSocketURL)
+
+	// Wait a moment for WebSocket to connect
+	time.Sleep(1 * time.Second)
+
+	// Start a new search session
+	if app.GetFlags().SearchID == "" {
+		app.BrokerSearchCreation("TruffleHog Search")
+	} else {
+		color.Green("[+] Using existing search ID: %s", app.GetFlags().SearchID)
+	}
+
+	if app.GetFlags().Debug {
+		color.Cyan("[*] Reading trufflehog output from stdin...")
+	}
+
+	// Read from stdin
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+
+		if app.GetFlags().Debug {
+			color.Cyan("[*] Received line: %s", line)
+		}
+
+		// Parse trufflehog JSON output
+		var result map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &result); err != nil {
+			if app.GetFlags().Debug {
+				color.Yellow("[!] Failed to parse trufflehog output: %v", err)
+			}
+			continue
+		}
+
+		// Add insert key and search ID to the message
+		result["insertToken"] = app.GetFlags().InsertKey
+		result["event"] = "trufflehog_result"
+		if app.GetFlags().SearchID != "" {
+			result["searchID"] = app.GetFlags().SearchID
+		}
+
+		// Convert back to JSON
+		jsonData, err := json.Marshal(result)
+		if err != nil {
+			if app.GetFlags().Debug {
+				color.Yellow("[!] Failed to marshal trufflehog output: %v", err)
+			}
+			continue
+		}
+
+		// Send to WebSocket
+		app.SendToWebSocket(string(jsonData))
+		if app.GetFlags().Debug {
+			color.Green("[+] Sent message to WebSocket")
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		color.Red("[!] Error reading trufflehog output: %v", err)
+		os.Exit(1)
+	}
 }
 
 var rootCmd = &cobra.Command{
@@ -79,6 +160,13 @@ var rootCmd = &cobra.Command{
 			app.ClearRepoStorage()
 		}
 
+		// Handle trufflehog mode
+		if app.GetFlags().Trufflehog {
+			handleTrufflehogInput()
+			return
+		}
+
+		// Start WebSocket if in dashboard mode (but not in trufflehog mode)
 		if app.GetFlags().Dashboard {
 			app.StartWebSocket(app.GetFlags().WebSocketURL)
 		}
