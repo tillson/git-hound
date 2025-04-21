@@ -126,23 +126,32 @@ var rootCmd = &cobra.Command{
 				if _, err := os.Stat(tokenFilePath); err == nil {
 					// Token file exists, read it
 					tokenBytes, err := ioutil.ReadFile(tokenFilePath)
-
 					if err == nil {
 						app.GetFlags().InsertKey = strings.TrimSpace(string(tokenBytes))
 					}
 				}
 			}
-			// fmt.Println(app.GetFlags().InsertKey)
-			// If we still don't have an insert key, start the WebSocket connection to get one
-			// if app.GetFlags().InsertKey == "" {
-			// 	color.Cyan("[*] Starting dashboard mode...")
-			// 	fmt.Println(app.GetFlags().WebSocketURL)
 
-			// } else {
-			// 	color.Green("[+] Dashboard mode enabled with Insert Key.")
-			// }
-			if !app.GetFlags().Trufflehog {
-				app.StartWebSocket(app.GetFlags().WebSocketURL)
+			// Start WebSocket connection
+			app.StartWebSocket(app.GetFlags().WebSocketURL)
+
+			// If we don't have an insert key, wait for verification
+			if app.GetFlags().InsertKey == "" {
+				color.Cyan("[*] Waiting for account verification...")
+				// Wait for authentication to complete
+				select {
+				case authenticated := <-app.WsAuthenticated:
+					if !authenticated {
+						color.Red("[!] Account verification failed")
+						os.Exit(1)
+					}
+					color.Green("[+] Account verified successfully")
+				case <-time.After(5 * time.Minute):
+					color.Red("[!] Account verification timed out after 5 minutes")
+					os.Exit(1)
+				}
+			} else {
+				color.Green("[+] Dashboard mode enabled with existing Insert Key")
 			}
 		}
 
@@ -160,10 +169,15 @@ var rootCmd = &cobra.Command{
 			app.StartWebSocket(app.GetFlags().WebSocketURL)
 
 			// Wait for authentication to complete
-			authenticated := <-app.WsAuthenticated
-			if !authenticated {
-				color.Red("WebSocket authentication failed")
-				return
+			select {
+			case authenticated := <-app.WsAuthenticated:
+				if !authenticated {
+					color.Red("WebSocket authentication failed")
+					return
+				}
+			case <-time.After(5 * time.Minute):
+				color.Red("[!] WebSocket authentication timed out after 5 minutes")
+				os.Exit(1)
 			}
 
 			// Start a new search session
@@ -506,47 +520,47 @@ func ReadConfig() {
 
 	app.GetFlags().InsertKey = insertKey
 
-	// Handle dashboard-specific configuration first
-	if app.GetFlags().Dashboard {
-		if app.GetFlags().InsertKey == "" {
-			// color.Cyan("[*] Starting dashboard mode...")
-			// Start WebSocket connection - this will handle the account linking process
-			// app.StartWebSocket(app.GetFlags().WebSocketURL)
+	// // Handle dashboard-specific configuration first
+	// if app.GetFlags().Dashboard {
+	// 	if app.GetFlags().InsertKey == "" {
+	// 		// color.Cyan("[*] Starting dashboard mode...")
+	// 		// Start WebSocket connection - this will handle the account linking process
+	// 		// app.StartWebSocket(app.GetFlags().WebSocketURL)
 
-			// Wait for the Insert Key to be set with timeout
-			timeout := time.After(30 * time.Second)
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
+	// 		// Wait for the Insert Key to be set with timeout
+	// 		timeout := time.After(30 * time.Second)
+	// 		ticker := time.NewTicker(1 * time.Second)
+	// 		defer ticker.Stop()
 
-			for {
-				select {
-				case <-ticker.C:
-					// Check if token file exists
-					homeDir, err := os.UserHomeDir()
-					if err != nil {
-						color.Red("Error getting home directory: %v", err)
-						continue
-					}
-					tokenFilePath := filepath.Join(homeDir, ".githound", "insert_token.txt")
-					if _, err := os.Stat(tokenFilePath); err == nil {
-						// Token file exists, read it
-						tokenBytes, err := ioutil.ReadFile(tokenFilePath)
-						if err == nil {
-							app.GetFlags().InsertKey = string(tokenBytes)
-							// color.Green("[+] Dashboard mode enabled with Insert Key.")
-							return
-						}
-					}
-				case <-timeout:
-					color.Red("[!] Timeout waiting for account linking. Please try again.")
-					os.Exit(1)
-				}
-			}
-		} else {
-			color.Green("[+] Dashboard mode enabled with Insert Key.")
-		}
-		return // Exit early for dashboard mode - no need to check GitHub token
-	}
+	// 		for {
+	// 			select {
+	// 			case <-ticker.C:
+	// 				// Check if token file exists
+	// 				homeDir, err := os.UserHomeDir()
+	// 				if err != nil {
+	// 					color.Red("Error getting home directory: %v", err)
+	// 					continue
+	// 				}
+	// 				tokenFilePath := filepath.Join(homeDir, ".githound", "insert_token.txt")
+	// 				if _, err := os.Stat(tokenFilePath); err == nil {
+	// 					// Token file exists, read it
+	// 					tokenBytes, err := ioutil.ReadFile(tokenFilePath)
+	// 					if err == nil {
+	// 						app.GetFlags().InsertKey = string(tokenBytes)
+	// 						// color.Green("[+] Dashboard mode enabled with Insert Key.")
+	// 						return
+	// 					}
+	// 				}
+	// 			case <-timeout:
+	// 				color.Red("[!] Timeout waiting for account linking. Please try again.")
+	// 				os.Exit(1)
+	// 			}
+	// 		}
+	// 	} else {
+	// 		color.Green("[+] Dashboard mode enabled with Insert Key.")
+	// 	}
+	// 	return // Exit early for dashboard mode - no need to check GitHub token
+	// }
 
 	// Now, check if the essential GitHub token is present
 	// Skip this check if in trufflehog mode

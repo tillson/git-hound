@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -62,6 +61,7 @@ func StartWebSocket(url string) {
 	} else {
 		payload = fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0"}`)
 	}
+	fmt.Println(payload)
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending WebSocket message: %v", err)
@@ -106,82 +106,68 @@ func StartWebSocket(url string) {
 			color.Cyan("Please visit the following URL to link your account: %s", url)
 			color.Cyan("Waiting for verification...")
 		}
-		isAuthenticated = true
-		WsAuthenticated <- true
-	}
-}
 
-func ConnectToAccount(response map[string]interface{}) string {
-	if wsConn == nil {
-		color.Red("WebSocket connection is not established")
-		return ""
-	}
-	var first = true
-	var message string
-	var token string
-	for {
-		if !first {
-			_, message, err := wsConn.ReadMessage()
-			if err != nil {
-				color.Red("Error reading WebSocket message: %v", err)
-				log.Fatal(err)
-			}
-
-			_ = json.Unmarshal(message, &response)
-		} else {
-			first = false
-		}
-
-		if loggedIn, ok := response["logged_in"].(bool); ok && !loggedIn {
-			fmt.Println("login failed")
-			if url, ok := response["url"].(string); ok {
-				color.Cyan("Please visit the following URL to link your account: %s", url)
-				color.Cyan("Waiting for verification...")
-				for i := 0; i < 3; i++ {
-					fmt.Print(".")
-					time.Sleep(500 * time.Millisecond)
-				}
-				fmt.Println()
-			}
-		} else if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
-			if insertToken, ok := response["insert_token"].(string); ok {
-				token = insertToken
-
-				homeDir, err := os.UserHomeDir()
+		// Start a goroutine to handle the authentication response
+		go func() {
+			for {
+				_, message, err := wsConn.ReadMessage()
 				if err != nil {
-					color.Red("Error getting home directory: %v", err)
-					log.Fatal(err)
+					color.Red("Error reading WebSocket message: %v", err)
+					WsAuthenticated <- false
+					return
 				}
 
-				gitHoundDir := filepath.Join(homeDir, ".githound")
-				tokenFilePath := filepath.Join(gitHoundDir, "insert_token.txt")
+				var response map[string]interface{}
+				if err := json.Unmarshal(message, &response); err != nil {
+					color.Red("Error unmarshalling WebSocket message: %v", err)
+					WsAuthenticated <- false
+					return
+				}
 
-				// Create the .githound directory if it doesn't exist
-				if _, err := os.Stat(gitHoundDir); os.IsNotExist(err) {
-					err = os.Mkdir(gitHoundDir, 0700)
-					if err != nil {
-						color.Red("Error creating .githound directory: %v", err)
-						log.Fatal(err)
+				if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
+					if insertToken, ok := response["insert_token"].(string); ok {
+						// Save the token
+						homeDir, err := os.UserHomeDir()
+						if err != nil {
+							color.Red("Error getting home directory: %v", err)
+							WsAuthenticated <- false
+							return
+						}
+
+						gitHoundDir := filepath.Join(homeDir, ".githound")
+						tokenFilePath := filepath.Join(gitHoundDir, "insert_token.txt")
+
+						// Create the .githound directory if it doesn't exist
+						if _, err := os.Stat(gitHoundDir); os.IsNotExist(err) {
+							err = os.Mkdir(gitHoundDir, 0700)
+							if err != nil {
+								color.Red("Error creating .githound directory: %v", err)
+								WsAuthenticated <- false
+								return
+							}
+						}
+
+						// Save the token to the file
+						err = ioutil.WriteFile(tokenFilePath, []byte(insertToken), 0600)
+						if err != nil {
+							color.Red("Error writing token file: %v", err)
+							WsAuthenticated <- false
+							return
+						}
+
+						// Set the insert key and mark as authenticated
+						GetFlags().InsertKey = insertToken
+						isAuthenticated = true
+						WsAuthenticated <- true
+						return
 					}
 				}
-
-				// Save the token to the file
-				err = ioutil.WriteFile(tokenFilePath, []byte(token), 0600)
-				if err != nil {
-					color.Red("Error writing token file: %v", err)
-					log.Fatal(err)
-				}
-
-				break
 			}
-		} else {
-			color.Red("Unexpected WebSocket response: %s", string(message))
-			log.Fatal("Unexpected WebSocket response")
-		}
+		}()
 
+		// Don't send any value to WsAuthenticated - let the goroutine handle it
+		isAuthenticated = false
 	}
-
-	return token
 }
 
 func SendMessageToWebSocket(message string) {
