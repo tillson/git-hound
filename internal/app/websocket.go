@@ -15,10 +15,14 @@ import (
 
 var wsConn *websocket.Conn
 var wsMessageChannel chan string
+var WsAuthenticated chan bool
+var isAuthenticated bool
 
 // var InsertKey string // Global variable for InsertKey
 
 func StartWebSocket(url string) {
+	WsAuthenticated = make(chan bool, 1) // Make channel buffered to prevent deadlock
+	// color.Cyan("[*] Connecting to WebSocket at %s", url)
 	dialer := websocket.Dialer{
 		HandshakeTimeout:  10 * time.Second,
 		EnableCompression: false,
@@ -28,9 +32,28 @@ func StartWebSocket(url string) {
 	if err != nil {
 		color.Red("Error connecting to GitHound Explore connector: %v", err)
 		time.Sleep(5 * time.Second)
+		WsAuthenticated <- false
 		return
 	}
+	color.Green("[+] WebSocket connection established")
 	wsMessageChannel = make(chan string)
+
+	// Start a goroutine to handle messages from the channel
+	go func() {
+		for {
+			select {
+			case msg := <-wsMessageChannel:
+				if wsConn == nil {
+					color.Red("[DEBUG] WebSocket connection is nil, cannot send message")
+					continue
+				}
+				err := wsConn.WriteMessage(websocket.TextMessage, []byte(msg))
+				if err != nil {
+					color.Red("[DEBUG] Error sending message from channel: %v", err)
+				}
+			}
+		}
+	}()
 
 	// Send initial message to start account linking
 	var payload string
@@ -42,6 +65,7 @@ func StartWebSocket(url string) {
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending WebSocket message: %v", err)
+		WsAuthenticated <- false
 		return
 	}
 
@@ -49,6 +73,7 @@ func StartWebSocket(url string) {
 	_, message, err := wsConn.ReadMessage()
 	if err != nil {
 		color.Red("Error reading initial WebSocket message: %v", err)
+		WsAuthenticated <- false
 		return
 	}
 
@@ -56,55 +81,23 @@ func StartWebSocket(url string) {
 	err = json.Unmarshal(message, &response)
 	if err != nil {
 		color.Red("Error unmarshalling initial WebSocket message: %v", err)
+		WsAuthenticated <- false
 		return
 	}
 
 	// If we have an insert token and the server confirms we're logged in, we're done
 	if GetFlags().InsertKey != "" {
 		if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
-			color.Green("[+] WebSocket connection established")
-
-			// If in trufflehog mode, send start_search message
+			isAuthenticated = true
+			WsAuthenticated <- true
+			// If in trufflehog mode, we'll start the search from the main function
 			if GetFlags().Trufflehog {
-				escapedQuery, err := json.Marshal("TruffleHog Search")
-				if err != nil {
-					color.Red("Error escaping search query")
-					return
-				}
-				payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
-				err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
-				if err != nil {
-					color.Red("Error sending search message: %v", err)
-					return
-				}
-
-				// Wait for search_ack response
-				_, message, err := wsConn.ReadMessage()
-				if err != nil {
-					color.Red("Error reading search response: %v", err)
-					return
-				}
-
-				var searchResponse map[string]interface{}
-				err = json.Unmarshal(message, &searchResponse)
-				if err != nil {
-					color.Red("Error unmarshalling search response: %v", err)
-					return
-				}
-
-				if event, ok := searchResponse["event"].(string); ok && event == "search_ack" {
-					if searchID, ok := searchResponse["searchID"].(string); ok {
-						GetFlags().SearchID = searchID
-						if url, ok := searchResponse["url"].(string); ok {
-							color.Green("Connected to GitHound Explore! View search results at: %s", url)
-						}
-					}
-				} else if errorMsg, ok := searchResponse["error"].(string); ok {
-					color.Red("Error starting search: %s", errorMsg)
-				}
+				// Search will be started from the main function
 			}
 		} else {
 			color.Red("[!] Invalid insert token")
+			isAuthenticated = false
+			WsAuthenticated <- false
 			return
 		}
 	} else {
@@ -113,75 +106,9 @@ func StartWebSocket(url string) {
 			color.Cyan("Please visit the following URL to link your account: %s", url)
 			color.Cyan("Waiting for verification...")
 		}
+		isAuthenticated = true
+		WsAuthenticated <- true
 	}
-
-	// Start a goroutine to handle incoming messages
-	go func() {
-		defer wsConn.Close()
-		for {
-			_, message, err := wsConn.ReadMessage()
-			if err != nil {
-				color.Red("Error reading WebSocket message: %v", err)
-				return
-			}
-
-			var response map[string]interface{}
-			err = json.Unmarshal(message, &response)
-			if err != nil {
-				color.Red("Error unmarshalling WebSocket message: %v", err)
-				continue
-			}
-
-			// Handle successful account linking
-			if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
-				if insertToken, ok := response["insert_token"].(string); ok {
-					GetFlags().InsertKey = insertToken
-
-					// Save the token to file
-					homeDir, err := os.UserHomeDir()
-					if err != nil {
-						color.Red("Error getting home directory: %v", err)
-						continue
-					}
-
-					gitHoundDir := filepath.Join(homeDir, ".githound")
-					tokenFilePath := filepath.Join(gitHoundDir, "insert_token.txt")
-
-					// Create the .githound directory if it doesn't exist
-					if _, err := os.Stat(gitHoundDir); os.IsNotExist(err) {
-						err = os.MkdirAll(gitHoundDir, 0700)
-						if err != nil {
-							color.Red("Error creating .githound directory: %v", err)
-							continue
-						}
-					}
-
-					// Save the token to the file
-					err = ioutil.WriteFile(tokenFilePath, []byte(insertToken), 0600)
-					if err != nil {
-						color.Red("Error writing token file: %v", err)
-						continue
-					}
-
-					color.Green("[+] Account linked successfully!")
-					color.Green("[+] Token saved to %s", tokenFilePath)
-				}
-			}
-		}
-	}()
-
-	// Start a goroutine to handle outgoing messages
-	go func() {
-		defer wsConn.Close()
-		for {
-			message := <-wsMessageChannel
-			err := wsConn.WriteMessage(websocket.TextMessage, []byte(message))
-			if err != nil {
-				color.Red("Error writing to WebSocket: %v", err)
-				return
-			}
-		}
-	}()
 }
 
 func ConnectToAccount(response map[string]interface{}) string {
@@ -265,10 +192,14 @@ func SendMessageToWebSocket(message string) {
 
 // SendToWebSocket sends a message to the WebSocket connection
 func SendToWebSocket(message string) {
-	if wsMessageChannel != nil {
-		wsMessageChannel <- message
-	} else {
+	if wsConn == nil {
 		color.Yellow("[!] WebSocket not initialized")
+		return
+	}
+
+	err := wsConn.WriteMessage(websocket.TextMessage, []byte(message))
+	if err != nil {
+		color.Red("Error sending WebSocket message: %v", err)
 	}
 }
 
@@ -278,38 +209,12 @@ func BrokerSearchCreation(query string) {
 		return
 	}
 
-	// First send the insert key to authenticate
-	authPayload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, GetFlags().InsertKey)
-	err := wsConn.WriteMessage(websocket.TextMessage, []byte(authPayload))
-	if err != nil {
-		color.Red("Error sending authentication message: %v", err)
+	if !isAuthenticated {
+		color.Red("WebSocket not authenticated")
 		return
 	}
 
-	// Wait for authentication response
-	_, message, err := wsConn.ReadMessage()
-	if err != nil {
-		color.Red("Error reading authentication response: %v", err)
-		return
-	}
-
-	var authResponse map[string]interface{}
-	err = json.Unmarshal(message, &authResponse)
-	if err != nil {
-		color.Red("Error unmarshalling authentication response: %v", err)
-		return
-	}
-
-	if loggedIn, ok := authResponse["logged_in"].(bool); !ok || !loggedIn {
-		color.Red("Error authenticating with insert key")
-		return
-	}
-
-	// Skip start_search if in dashboard mode with search ID
-	if GetFlags().Dashboard && GetFlags().SearchID != "" {
-		color.Green("Connected to GitHound Explore! Using existing search ID: %s", GetFlags().SearchID)
-		return
-	}
+	color.Cyan("[*] Starting search for query: %s", query)
 
 	// Now send the search query
 	escapedQuery, err := json.Marshal(query)
@@ -324,7 +229,7 @@ func BrokerSearchCreation(query string) {
 		return
 	}
 
-	_, message, err = wsConn.ReadMessage()
+	_, message, err := wsConn.ReadMessage()
 	if err != nil {
 		color.Red("Error reading search response: %v", err)
 		return
@@ -338,7 +243,8 @@ func BrokerSearchCreation(query string) {
 	}
 
 	if event, ok := response["event"].(string); ok && event == "search_ack" {
-		if _, ok := response["searchID"].(string); ok {
+		if searchID, ok := response["searchID"].(string); ok {
+			GetFlags().SearchID = searchID
 			if url, ok := response["url"].(string); ok {
 				color.Green("Connected to GitHound Explore! View search results at: %s", url)
 			}
@@ -346,4 +252,44 @@ func BrokerSearchCreation(query string) {
 	} else if errorMsg, ok := response["error"].(string); ok {
 		color.Red("Error starting search: %s", errorMsg)
 	}
+
+	// Set up a goroutine to handle sending results
+	go func() {
+		for {
+			// Read any incoming messages to keep the connection alive
+			_, message, err := wsConn.ReadMessage()
+			if err != nil {
+				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+					color.Red("WebSocket connection closed unexpectedly: %v", err)
+					return
+				}
+				continue
+			}
+
+			// Handle any incoming messages if needed
+			var msg map[string]interface{}
+			if err := json.Unmarshal(message, &msg); err == nil {
+				if event, ok := msg["event"].(string); ok {
+					switch event {
+					case "ping":
+						wsConn.WriteMessage(websocket.TextMessage, []byte(`{"event": "pong"}`))
+					case "trufflehog_result":
+						// Process trufflehog results
+						if result, ok := msg["result"].(map[string]interface{}); ok {
+							// Add the result to the search results
+							resultJSON, err := json.Marshal(result)
+							if err == nil {
+								searchID := GetFlags().SearchID
+								if searchID != "" {
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+								} else {
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}()
 }

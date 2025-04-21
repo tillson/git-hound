@@ -82,8 +82,36 @@ var rootCmd = &cobra.Command{
 			app.ClearRepoStorage()
 		}
 
+		var queries []string
+
+		if cmd.Flag("query").Value.String() != "" {
+			queries = append(queries, cmd.Flag("query").Value.String())
+		}
+		if cmd.Flag("query-file").Value.String() != "" {
+			for _, query := range app.GetFileLines(app.GetFlags().QueryFile) {
+				queries = append(queries, query)
+			}
+
+		}
+		if !terminal.IsTerminal(0) && !app.GetFlags().Trufflehog {
+			scanner := getScanner(args)
+			for scanner.Scan() {
+				bytes := scanner.Bytes()
+				str := string(bytes)
+				if str != "" {
+					queries = append(queries, str)
+				}
+			}
+		}
+		// fmt.Println(queries)
+
 		// fmt.Println(123)
 		// Handle dashboard mode
+
+		if app.GetFlags().Trufflehog {
+			app.GetFlags().Dashboard = true
+		}
+
 		if app.GetFlags().Dashboard {
 			// First try to read the insert key from file
 			homeDir, err := os.UserHomeDir()
@@ -104,22 +132,24 @@ var rootCmd = &cobra.Command{
 					}
 				}
 			}
-			fmt.Println(app.GetFlags().InsertKey)
+			// fmt.Println(app.GetFlags().InsertKey)
 			// If we still don't have an insert key, start the WebSocket connection to get one
-			if app.GetFlags().InsertKey == "" {
-				color.Cyan("[*] Starting dashboard mode...")
+			// if app.GetFlags().InsertKey == "" {
+			// 	color.Cyan("[*] Starting dashboard mode...")
+			// 	fmt.Println(app.GetFlags().WebSocketURL)
+
+			// } else {
+			// 	color.Green("[+] Dashboard mode enabled with Insert Key.")
+			// }
+			if !app.GetFlags().Trufflehog {
 				app.StartWebSocket(app.GetFlags().WebSocketURL)
-			} else {
-				color.Green("[+] Dashboard mode enabled with Insert Key.")
 			}
 		}
 
 		// Handle trufflehog mode
 		if app.GetFlags().Trufflehog {
-			if !app.GetFlags().Dashboard {
-				color.Red("[!] Trufflehog mode requires --dashboard flag to be set")
-				os.Exit(1)
-			}
+			// Automatically enable dashboard mode when trufflehog is enabled
+			app.GetFlags().Dashboard = true
 
 			if app.GetFlags().InsertKey == "" {
 				color.Red("[!] Trufflehog mode requires an Insert Key to be set")
@@ -129,12 +159,15 @@ var rootCmd = &cobra.Command{
 			// Initialize WebSocket connection
 			app.StartWebSocket(app.GetFlags().WebSocketURL)
 
-			// Start a new search session
-			if app.GetFlags().SearchID == "" {
-				app.BrokerSearchCreation("TruffleHog Search")
-			} else {
-				color.Green("[+] Using existing search ID: %s", app.GetFlags().SearchID)
+			// Wait for authentication to complete
+			authenticated := <-app.WsAuthenticated
+			if !authenticated {
+				color.Red("WebSocket authentication failed")
+				return
 			}
+
+			// Start a new search session
+			app.BrokerSearchCreation("TruffleHog Search")
 
 			color.Cyan("[*] Waiting for trufflehog output from stdin...")
 			color.Cyan("[*] Example usage: trufflehog git <repo-url> --json | go run main.go --trufflehog --dashboard")
@@ -198,28 +231,6 @@ var rootCmd = &cobra.Command{
 			select {}
 		}
 
-		var queries []string
-
-		if cmd.Flag("query").Value.String() != "" {
-			queries = append(queries, cmd.Flag("query").Value.String())
-		}
-		if cmd.Flag("query-file").Value.String() != "" {
-			for _, query := range app.GetFileLines(app.GetFlags().QueryFile) {
-				queries = append(queries, query)
-			}
-
-		}
-		if !terminal.IsTerminal(0) {
-			scanner := getScanner(args)
-			for scanner.Scan() {
-				bytes := scanner.Bytes()
-				str := string(bytes)
-				if str != "" {
-					queries = append(queries, str)
-				}
-			}
-		}
-
 		if len(queries) == 0 {
 			if app.GetFlags().Dashboard {
 				color.Red("[!] No search queries specified.")
@@ -256,11 +267,11 @@ var rootCmd = &cobra.Command{
 						continue
 					}
 				}
+			} else {
+				color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
+				os.Exit(1)
+				return
 			}
-		} else {
-			color.Red("[!] No search queries specified. Use flag `--query [query]`, or pipe query into GitHound.")
-			os.Exit(1)
-			return
 		}
 
 		var allRules []app.Rule
