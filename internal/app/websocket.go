@@ -117,12 +117,18 @@ func StartWebSocket(url string) {
 					return
 				}
 
+				// Print the raw message for debugging
+				color.Cyan("[DEBUG] Received WebSocket message: %s", string(message))
+
 				var response map[string]interface{}
 				if err := json.Unmarshal(message, &response); err != nil {
 					color.Red("Error unmarshalling WebSocket message: %v", err)
 					WsAuthenticated <- false
 					return
 				}
+
+				// Print the parsed response for debugging
+				color.Cyan("[DEBUG] Parsed WebSocket response: %+v", response)
 
 				if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
 					if insertToken, ok := response["insert_token"].(string); ok {
