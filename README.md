@@ -4,7 +4,7 @@ A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 
 🚀 New in v3.0.0! Try the GitHound Web Dashboard  
-Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag.
+Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag. Keep in mind you can still use GitHound without the dashboard.
 
 
 
