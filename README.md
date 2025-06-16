@@ -4,7 +4,7 @@ A pattern-matching, patch-attacking, batch-catching secret snatcher.
 
 
 🚀 New in v3.0.0! Try the GitHound Web Dashboard  
-Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag.
+Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag. Learn how to use this with a local installation of GitHound or TruffleHog at the [Wiki page](https://github.com/tillson/git-hound/wiki/GitHound-Explore-%E2%80%93%C2%A0UI-for-result-filtering-&-cloud-scans). Keep in mind you can still use GitHound without the dashboard.
 
 
 
