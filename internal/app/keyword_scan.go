@@ -181,9 +181,17 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 					if err == nil {
 						searchID := GetFlags().SearchID
 						if searchID != "" {
-							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+							if GetFlags().Trufflehog {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+							} else {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": "%s"}`, GetFlags().InsertKey, searchID, string(resultJSON), repo.Query))
+							}
 						} else {
-							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+							if GetFlags().Trufflehog {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+							} else {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": "%s"}`, GetFlags().InsertKey, string(resultJSON), repo.Query))
+							}
 						}
 					} else {
 						color.Red("Error marshalling result to JSON: %v", err)

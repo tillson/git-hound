@@ -154,6 +154,15 @@ var rootCmd = &cobra.Command{
 			} else {
 				color.Green("[+] Dashboard mode enabled with existing Insert Key")
 			}
+
+			// Only start a new search if we don't have a search ID
+			if app.GetFlags().SearchID == "" {
+				for _, query := range queries {
+					app.BrokerSearchCreation(query)
+				}
+			} else {
+				color.Green("[+] Using existing search ID: %s", app.GetFlags().SearchID)
+			}
 		}
 
 		// Handle trufflehog mode

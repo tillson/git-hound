@@ -63,7 +63,7 @@ func SearchWithUI(queries []string) {
 		color.Cyan("[*] Logged into GitHub as " + viper.GetString("github_username"))
 	}
 	for _, query := range queries {
-		if GetFlags().Dashboard && GetFlags().InsertKey != "" {
+		if GetFlags().Dashboard && GetFlags().InsertKey != "" && GetFlags().SearchID == "" {
 			BrokerSearchCreation(query)
 		}
 		_, err = Search(query, client)
