@@ -268,6 +268,20 @@ func BrokerSearchCreation(query string) {
 					case "trufflehog_result":
 						// Process trufflehog results
 						if result, ok := msg["result"].(map[string]interface{}); ok {
+							// Handle filesystem results
+							if sourceMetadata, ok := result["SourceMetadata"].(map[string]interface{}); ok {
+								if data, ok := sourceMetadata["Data"].(map[string]interface{}); ok {
+									if filesystem, ok := data["Filesystem"].(map[string]interface{}); ok {
+										if file, ok := filesystem["file"].(string); ok {
+											// Extract filename from full path
+											filename := filepath.Base(file)
+											// Set repo to FILESYSTEM for filesystem results
+											result["repo"] = "FILESYSTEM"
+											result["filename"] = filename
+										}
+									}
+								}
+							}
 							// Add the result to the search results
 							resultJSON, err := json.Marshal(result)
 							if err == nil {

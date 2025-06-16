@@ -294,10 +294,27 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []*Mat
 	// Pre-allocate the matches slice
 	matches = make([]*Match, 0, 3)
 
-	regexString := "(?i)(vim_settings\\.xml)(\\.(zip|env|docx|xlsx|pptx|pdf))$"
+	// Default extensions if no file is specified
+	defaultExtensions := []string{
+		"ipynb", "zip", "xlsx", "pptx", "docx", "pdf", "csv", "sql", "db", "sqlite",
+		"env", "properties", "config", "conf", "ini", "xml",
+		"bak", "backup", "old", "tmp", "temp", "log", "logs", "pkl",
+	}
+
+	// Get extensions from file if specified
+	var extensions []string
+	if GetFlags().FileExtensions != "" {
+		extensions = GetFileLines(GetFlags().FileExtensions)
+	} else {
+		extensions = defaultExtensions
+	}
+
+	// Build regex pattern from extensions
+	extPattern := strings.Join(extensions, "|")
+	regexString := fmt.Sprintf("(?i)\\.(%s)$", extPattern)
 	regex := regexp.MustCompile(regexString)
 
-	// Find all match indices instead of using FindAllStringSubmatch
+	// Find all match indices
 	matchIndices := regex.FindAllIndex([]byte(source), -1)
 
 	for _, matchIndex := range matchIndices {

@@ -34,6 +34,7 @@ type Flags struct {
 	GithubAccessToken string // GitHub API token
 	InsertKey         string // GitHoundExplore Insert Key
 	Trufflehog        bool   // Ingest trufflehog output without scanning
+	FileExtensions    string // Path to file containing file extensions to search for
 }
 
 var flags Flags

@@ -58,6 +58,7 @@ func InitializeFlags() {
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().EnableProfiling, "profile", false, "Enable pprof profiling on localhost:6060")
 	rootCmd.PersistentFlags().StringVar(&app.GetFlags().ProfileAddr, "profile-addr", "localhost:6060", "Address to serve pprof profiles")
 	rootCmd.PersistentFlags().BoolVar(&app.GetFlags().Trufflehog, "trufflehog", false, "Ingest trufflehog output without scanning")
+	rootCmd.PersistentFlags().StringVar(&app.GetFlags().FileExtensions, "file-exts", "", "Path to file containing file extensions to search for (one per line)")
 }
 
 var rootCmd = &cobra.Command{
