@@ -85,6 +85,10 @@ func SearchWithAPI(queries []string) {
 			result, _, err := client.Search.Code(context.Background(), query, &options)
 			for err != nil {
 				fmt.Println(err)
+				if strings.Contains(err.Error(), "ERROR_TYPE_QUERY_PARSING_FATAL") {
+					color.Red("[!] Invalid query: %s (maybe you need to use quotes?)", query)
+					os.Exit(1)
+				}
 				resetTime := extractResetTime(err.Error())
 				sleepDuration := resetTime + 3
 				color.Yellow("[!] GitHub API rate limit exceeded. Waiting %d seconds...", sleepDuration)
