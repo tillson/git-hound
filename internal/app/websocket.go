@@ -214,7 +214,7 @@ func BrokerSearchCreation(query string) {
 		color.Red("Error escaping search query")
 		return
 	}
-	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
+	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": "%s"}`, GetFlags().InsertKey, escapedQuery)
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending search message: %v", err)
@@ -286,10 +286,13 @@ func BrokerSearchCreation(query string) {
 							resultJSON, err := json.Marshal(result)
 							if err == nil {
 								searchID := GetFlags().SearchID
+								// Properly escape the search term
+								searchTerm := GetFlags().SearchTerm
+								escapedSearchTerm, _ := json.Marshal(searchTerm)
 								if searchID != "" {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedSearchTerm)))
 								} else {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedSearchTerm)))
 								}
 							}
 						}
