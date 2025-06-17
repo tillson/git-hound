@@ -214,7 +214,7 @@ func BrokerSearchCreation(query string) {
 		color.Red("Error escaping search query")
 		return
 	}
-	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": "%s"}`, GetFlags().InsertKey, escapedQuery)
+	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending search message: %v", err)
