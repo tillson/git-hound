@@ -134,6 +134,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			resultRepoURL := GetRepoURLForSearchResult(repo)
 			i := 0
 			for _, result := range matches {
+				// Create the result payload
 				resultPayload := map[string]interface{}{
 					"repo":              resultRepoURL,
 					"context":           result.Line.Text,
@@ -142,6 +143,15 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 					"file_last_updated": repo.SourceFileLastUpdated,
 					"file_last_author":  repo.SourceFileLastAuthorEmail,
 					"url":               GetResultLink(repo, result),
+				}
+
+				// For dug matches, update the file information while maintaining the structure
+				if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+					resultPayload["file"] = result.File
+					resultPayload["url"] = GetResultLink(RepoSearchResult{
+						Repo: repo.Repo,   // Use the original repo
+						File: result.File, // Use the dug file path
+					}, result)
 				}
 
 				// Use mutex to protect access to uniqueMatches map
