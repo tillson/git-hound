@@ -74,9 +74,6 @@ func SearchWithAPI(queries []string) {
 	http_client.Transport = rt
 
 	for _, query := range queries {
-		if GetFlags().Dashboard && GetFlags().InsertKey != "" && GetFlags().SearchID == "" {
-			BrokerSearchCreation(query)
-		}
 		for page := 0; page < int(math.Min(10, float64(GetFlags().Pages))); page++ {
 			options.Page = page
 			if GetFlags().Debug {
