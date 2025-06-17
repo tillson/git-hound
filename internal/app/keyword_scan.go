@@ -148,14 +148,20 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 				// For dug matches, update the file information while maintaining the structure
 				if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
 					resultPayload["file"] = result.File
-					resultPayload["url"] = GetResultLink(RepoSearchResult{
-						Repo: repo.Repo,   // Use the original repo
-						File: result.File, // Use the dug file path
-					}, result)
+					// Extract the base URL and commit hash from the original URL
+					baseURL := strings.Split(repo.URL, "/blob/")[0]
+					commitHash := strings.Split(repo.URL, "/blob/")[1]
+					commitHash = strings.Split(commitHash, "/")[0]
+					// Construct new URL with the file path from result.File
+					resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
 				}
 
 				// Use mutex to protect access to uniqueMatches map
 				matchKey := fmt.Sprintf("%s|%s", resultPayload["match"], resultRepoURL)
+				// For dig-files matches, include the file path in the deduplication key
+				if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+					matchKey = fmt.Sprintf("%s|%s|%s", resultPayload["match"], resultRepoURL, result.File)
+				}
 				mapMutex.Lock()
 				isDuplicate := uniqueMatches[matchKey]
 				if !isDuplicate {
@@ -183,7 +189,19 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 						PrintContextLine(result.Line)
 						PrintPatternLine(result)
 						PrintAttributes(result)
-						color.New(color.Faint).Println(GetResultLink(repo, result))
+						// Always print the file path
+						if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+							color.New(color.Faint).Println("file:     " + result.File)
+							// Construct URL for dig-files matches
+							baseURL := strings.Split(repo.URL, "/blob/")[0]
+							commitHash := strings.Split(repo.URL, "/blob/")[1]
+							commitHash = strings.Split(commitHash, "/")[0]
+							digURL := fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+							color.New(color.Faint).Println(digURL)
+						} else {
+							color.New(color.Faint).Println("file:     " + repo.File)
+							color.New(color.Faint).Println(GetResultLink(repo, result))
+						}
 					}
 				}
 				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
@@ -195,6 +213,15 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
 							} else {
 								escapedQuery, _ := json.Marshal(repo.Query)
+								// For dig-files matches, ensure the file path and URL are correctly set
+								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+									resultPayload["file"] = result.File
+									baseURL := strings.Split(repo.URL, "/blob/")[0]
+									commitHash := strings.Split(repo.URL, "/blob/")[1]
+									commitHash = strings.Split(commitHash, "/")[0]
+									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+									resultJSON, _ = json.Marshal(resultPayload)
+								}
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
 							}
 						} else {
@@ -202,6 +229,15 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
 							} else {
 								escapedQuery, _ := json.Marshal(repo.Query)
+								// For dig-files matches, ensure the file path and URL are correctly set
+								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+									resultPayload["file"] = result.File
+									baseURL := strings.Split(repo.URL, "/blob/")[0]
+									commitHash := strings.Split(repo.URL, "/blob/")[1]
+									commitHash = strings.Split(commitHash, "/")[0]
+									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+									resultJSON, _ = json.Marshal(resultPayload)
+								}
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
 							}
 						}
@@ -317,7 +353,7 @@ func MatchFileExtensions(source string, result RepoSearchResult) (matches []*Mat
 	// Default extensions if no file is specified
 	defaultExtensions := []string{
 		"ipynb", "zip", "xlsx", "pptx", "docx", "pdf", "csv", "sql", "db", "sqlite",
-		"env", "properties", "config", "conf", "ini", "xml",
+		"env", "properties", "config", "conf", "ini",
 		"bak", "backup", "old", "tmp", "temp", "log", "logs", "pkl",
 	}
 

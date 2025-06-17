@@ -208,9 +208,22 @@ func digHelper(result RepoSearchResult) []*Match {
 				processedFiles++
 				if fileMatches != nil {
 					for _, match := range fileMatches {
+						// For dug files, we want to show each file separately
+						// Only deduplicate exact matches from the same file
 						matchKey := fmt.Sprintf("%s|%s|%s", match.Text, match.File, match.Line.Text)
 						if !matchMap[matchKey] {
 							matchMap[matchKey] = true
+							// Add dig-files attribute if not already present
+							hasDigFiles := false
+							for _, attr := range match.Attributes {
+								if attr == "dig-files" {
+									hasDigFiles = true
+									break
+								}
+							}
+							if !hasDigFiles {
+								match.Attributes = append(match.Attributes, "dig-files")
+							}
 							matches = append(matches, match)
 						}
 					}
