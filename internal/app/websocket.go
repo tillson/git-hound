@@ -286,13 +286,10 @@ func BrokerSearchCreation(query string) {
 							resultJSON, err := json.Marshal(result)
 							if err == nil {
 								searchID := GetFlags().SearchID
-								// Properly escape the search term
-								searchTerm := GetFlags().SearchTerm
-								escapedSearchTerm, _ := json.Marshal(searchTerm)
 								if searchID != "" {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedSearchTerm)))
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
 								} else {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedSearchTerm)))
+									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
 								}
 							}
 						}

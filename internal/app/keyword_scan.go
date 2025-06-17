@@ -184,13 +184,15 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 							if GetFlags().Trufflehog {
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
 							} else {
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": "%s"}`, GetFlags().InsertKey, searchID, string(resultJSON), repo.Query))
+								escapedQuery, _ := json.Marshal(repo.Query)
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
 							}
 						} else {
 							if GetFlags().Trufflehog {
 								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
 							} else {
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": "%s"}`, GetFlags().InsertKey, string(resultJSON), repo.Query))
+								escapedQuery, _ := json.Marshal(repo.Query)
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
 							}
 						}
 					} else {
