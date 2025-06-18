@@ -75,6 +75,19 @@ func digHelper(result RepoSearchResult) []*Match {
 		fmt.Printf("[DEBUG] Starting digHelper for repo: %s\n", result.Repo)
 	}
 
+	// Check if this repo has already been processed
+	reposMutex.Lock()
+	for _, finishedRepo := range finishedRepos {
+		if finishedRepo == result.Repo {
+			reposMutex.Unlock()
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Skipping already processed repo: %s\n", result.Repo)
+			}
+			return matches
+		}
+	}
+	reposMutex.Unlock()
+
 	var repo *git.Repository
 	var err error
 	if _, err = os.Stat("/tmp/githound/" + result.Repo); os.IsNotExist(err) {
@@ -89,7 +102,7 @@ func digHelper(result RepoSearchResult) []*Match {
 		repo, err = git.PlainCloneContext(context, "/tmp/githound/"+result.Repo, false, &git.CloneOptions{
 			URL:          "https://github.com/" + result.Repo,
 			SingleBranch: true,
-			Depth:        20,
+			Depth:        1, // Only get the current state, no history
 		})
 
 		if err != nil {
@@ -139,7 +152,20 @@ func digHelper(result RepoSearchResult) []*Match {
 			}
 
 			err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if info.IsDir() {
+					return nil
+				}
 				if strings.HasPrefix(path, root+"/.git/") {
+					return nil
+				}
+				// Skip files larger than 10MB
+				if info.Size() > 10*1024*1024 {
+					if GetFlags().Debug {
+						fmt.Printf("[DEBUG] Skipping large file (>10MB): %s (%d bytes)\n", path, info.Size())
+					}
 					return nil
 				}
 				ext := strings.ToLower(filepath.Ext(path))
@@ -293,6 +319,18 @@ func digHelper(result RepoSearchResult) []*Match {
 		if GetFlags().Debug {
 			fmt.Printf("[DEBUG] Total processing time for %s: %v\n", result.Repo, time.Since(startTime))
 		}
+
+		// Clean up the repository from local storage
+		repoPath := "/tmp/githound/" + result.Repo
+		if err := os.RemoveAll(repoPath); err != nil {
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Error cleaning up repo %s: %v\n", result.Repo, err)
+			}
+		} else {
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Cleaned up repo from local storage: %s\n", result.Repo)
+			}
+		}
 	}
 
 	return matches
@@ -308,40 +346,12 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		return nil
 	}
 
-	// Quick check for binary files
-	if len(data) > 0 && data[0] == 0 {
-		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Skipping binary file: %s\n", file)
-		}
-		return nil
-	}
-
-	// Convert to ASCII efficiently
-	ascii := make([]byte, 0, len(data))
-	for _, b := range data {
-		if 0 < b && b < 127 {
-			ascii = append(ascii, b)
-		}
-	}
-
-	// Skip if too much binary content
-	if float32(len(ascii))/float32(len(data)) < 0.9 {
-		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Skipping file with too much binary content: %s\n", file)
-		}
-		return nil
-	}
-
-	if GetFlags().Debug {
-		fmt.Printf("[DEBUG] Read and processed file %s in %v\n", file, time.Since(readStart))
-	}
-
 	fileResult := result
 	fileResult.File = file
 	score := 0
 	var newMatches []*Match
 
-	// Check file extensions first
+	// Always check file extensions first (regardless of content)
 	extStart := time.Now()
 	fileExtMatches := MatchFileExtensions(file, fileResult)
 	for _, match := range fileExtMatches {
@@ -353,17 +363,72 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		fmt.Printf("[DEBUG] File extension check for %s took %v\n", file, time.Since(extStart))
 	}
 
-	// Only do full text search if we haven't found anything yet
-	if score == 0 {
-		searchStart := time.Now()
-		searchMatches, searchScore := GetMatchesForString(string(ascii), result, true)
-		score += searchScore
-		if searchScore > -1 {
-			newMatches = append(newMatches, searchMatches...)
+	// Improved binary detection - check first 1KB for null bytes
+	isBinary := false
+	if len(data) > 1024 {
+		binaryCount := 0
+		checkSize := 1024
+		if len(data) < checkSize {
+			checkSize = len(data)
 		}
+		for i := 0; i < checkSize; i++ {
+			if data[i] == 0 {
+				binaryCount++
+			}
+		}
+		if float32(binaryCount)/float32(checkSize) > 0.1 {
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Skipping text processing for binary file (too many null bytes): %s\n", file)
+			}
+			isBinary = true
+		}
+	} else if len(data) > 0 && data[0] == 0 {
+		// Quick check for single byte files
 		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Text search for %s took %v\n", file, time.Since(searchStart))
+			fmt.Printf("[DEBUG] Skipping text processing for binary file (starts with null): %s\n", file)
 		}
+		isBinary = true
+	}
+
+	// Only do full text search if file is not binary and we haven't found anything yet
+	if !isBinary && score == 0 {
+		// Convert to ASCII efficiently - only if necessary
+		var content string
+		binaryRatio := float32(0)
+		if len(data) > 0 {
+			ascii := make([]byte, 0, len(data))
+			for _, b := range data {
+				if b > 0 && b < 127 {
+					ascii = append(ascii, b)
+				}
+			}
+			binaryRatio = float32(len(ascii)) / float32(len(data))
+			content = string(ascii)
+		} else {
+			content = ""
+			binaryRatio = 1.0
+		}
+
+		// Skip text processing if too much binary content
+		if binaryRatio < 0.9 {
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Skipping text processing for file with too much binary content: %s (ratio: %.2f)\n", file, binaryRatio)
+			}
+		} else {
+			searchStart := time.Now()
+			searchMatches, searchScore := GetMatchesForString(content, result, true)
+			score += searchScore
+			if searchScore > -1 {
+				newMatches = append(newMatches, searchMatches...)
+			}
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Text search for %s took %v\n", file, time.Since(searchStart))
+			}
+		}
+	}
+
+	if GetFlags().Debug {
+		fmt.Printf("[DEBUG] Read and processed file %s in %v\n", file, time.Since(readStart))
 	}
 
 	if score > 1 {
