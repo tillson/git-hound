@@ -109,7 +109,9 @@ func (p *WorkerPool) Submit(job JobFunc) {
 		if GetFlags().Debug {
 			LogInfo("Worker pool queue full, executing job directly")
 		}
-		job()
+		// Execute the job in a new goroutine to avoid blocking the caller
+		// and ensure proper wait group handling
+		go job()
 	}
 }
 

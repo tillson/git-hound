@@ -254,6 +254,9 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			PutMatches(matches)
 		}
 	}
+	if GetFlags().Debug {
+		fmt.Printf("[DEBUG] Finishing scan for repo: %s, calling SearchWaitGroup.Done()\n", repo.Repo)
+	}
 	SearchWaitGroup.Done()
 }
 

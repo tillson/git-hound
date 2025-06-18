@@ -134,6 +134,9 @@ func SearchWithAPI(queries []string) {
 
 				// Increment the wait group before submitting the job
 				SearchWaitGroup.Add(1)
+				if GetFlags().Debug {
+					fmt.Printf("[DEBUG] Added to wait group for repo: %s (total: %d)\n", author_repo_str, len(result.CodeResults))
+				}
 
 				// Submit the job to the worker pool instead of creating a goroutine directly
 				workerPool.Submit(func() {

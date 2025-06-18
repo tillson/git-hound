@@ -32,6 +32,16 @@ var (
 		".mp3": true, ".mp4": true, ".mov": true, ".wav": true, ".ogg": true,
 		".ttf": true, ".woff": true, ".woff2": true, ".eot": true,
 	}
+	// Skip these directories
+	skipFolders = map[string]bool{
+		"node_modules": true, "vendor": true, "dist": true, "build": true, "target": true,
+		"coverage": true, "test-results": true, "logs": true, "tmp": true,
+		".cache": true, ".m2": true, ".gradle": true, "site-packages": true,
+		".git": true, ".svn": true, ".hg": true, ".bzr": true,
+		"__pycache__": true, ".pytest_cache": true, ".tox": true,
+		"bower_components": true, "jspm_packages": true, "packages": true,
+		".nuget": true, "bin": true, "obj": true, "docs": true, "sdks": true,
+	}
 )
 
 // Dig into the secrets of a repo
@@ -41,27 +51,11 @@ func Dig(result RepoSearchResult) []*Match {
 		fmt.Printf("[DEBUG] Starting Dig for repo: %s\n", result.Repo)
 	}
 
-	matchChannel := make(chan []*Match, 1)
-	if GetFlags().Debug {
-		fmt.Printf("[DEBUG] Submitting job to worker pool for repo: %s\n", result.Repo)
-	}
-	GetGlobalPool().Submit(func() {
-		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Worker started processing repo: %s\n", result.Repo)
-		}
-		matchChannel <- digHelper(result)
-		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Worker completed processing repo: %s\n", result.Repo)
-		}
-		close(matchChannel)
-	})
+	// Execute digHelper directly instead of using worker pool to avoid deadlock
+	matches := digHelper(result)
 
 	if GetFlags().Debug {
-		fmt.Printf("[DEBUG] Waiting for results from repo: %s\n", result.Repo)
-	}
-	matches := <-matchChannel
-	if GetFlags().Debug {
-		fmt.Printf("[DEBUG] Received results for repo: %s in %v\n", result.Repo, time.Since(startTime))
+		fmt.Printf("[DEBUG] Completed Dig for repo: %s in %v\n", result.Repo, time.Since(startTime))
 	}
 	return matches
 }
@@ -156,6 +150,14 @@ func digHelper(result RepoSearchResult) []*Match {
 					return err
 				}
 				if info.IsDir() {
+					// Check if this directory should be skipped
+					dirName := filepath.Base(path)
+					if skipFolders[dirName] {
+						if GetFlags().Debug {
+							fmt.Printf("[DEBUG] Skipping directory: %s\n", path)
+						}
+						return filepath.SkipDir
+					}
 					return nil
 				}
 				if strings.HasPrefix(path, root+"/.git/") {
