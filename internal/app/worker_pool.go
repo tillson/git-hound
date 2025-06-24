@@ -106,7 +106,6 @@ func (p *WorkerPool) Submit(job JobFunc) {
 		}
 	default:
 		// Channel is full, execute job directly in current goroutine
-		// This respects the thread limit by not creating additional goroutines
 		if GetFlags().Debug {
 			LogInfo("Worker pool queue full, executing job directly")
 		}

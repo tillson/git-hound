@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -16,23 +17,47 @@ var wsConn *websocket.Conn
 var wsMessageChannel chan string
 var WsAuthenticated chan bool
 var isAuthenticated bool
+var wsURL string // Store the WebSocket URL for reconnection
 
 // var InsertKey string // Global variable for InsertKey
 
+// StartWebSocket initializes the WebSocket connection with reconnection logic
 func StartWebSocket(url string) {
+	wsURL = url                          // Store URL for reconnection attempts
 	WsAuthenticated = make(chan bool, 1) // Make channel buffered to prevent deadlock
+
+	// Try to establish connection with reconnection logic
+	success := establishWebSocketConnection(url)
+	if !success {
+		// If initial connection fails and we have a search_id, try reconnecting
+		if GetFlags().SearchID != "" {
+			color.Yellow("[!] Initial WebSocket connection failed. Attempting reconnection...")
+			success = attemptWebSocketReconnection(url, 3)
+			if !success {
+				color.Red("[!] Failed to establish WebSocket connection after 3 attempts. Exiting.")
+				os.Exit(1)
+			}
+			// Send authentication success signal
+			WsAuthenticated <- true
+		} else {
+			color.Red("[!] WebSocket connection failed and no search_id provided. Exiting.")
+			os.Exit(1)
+		}
+	}
+}
+
+// establishWebSocketConnection attempts to establish a single WebSocket connection
+func establishWebSocketConnection(url string) bool {
 	// color.Cyan("[*] Connecting to WebSocket at %s", url)
 	dialer := websocket.Dialer{
-		HandshakeTimeout:  10 * time.Second,
+		HandshakeTimeout:  5 * time.Second,
 		EnableCompression: false,
 	}
 	var err error
 	wsConn, _, err = dialer.Dial(url, nil)
 	if err != nil {
 		color.Red("Error connecting to GitHound Explore connector: %v", err)
-		time.Sleep(5 * time.Second)
-		WsAuthenticated <- false
-		return
+		return false
 	}
 	color.Green("[+] WebSocket connection established")
 	wsMessageChannel = make(chan string)
@@ -43,12 +68,42 @@ func StartWebSocket(url string) {
 			select {
 			case msg := <-wsMessageChannel:
 				if wsConn == nil {
-					color.Red("[DEBUG] WebSocket connection is nil, cannot send message")
+					if GetFlags().Debug {
+						color.Red("[DEBUG] WebSocket connection is nil, cannot send message")
+					}
 					continue
+				}
+				if GetFlags().Debug {
+					color.Red("[DEBUG] Sending WebSocket message from channel: %s", msg)
 				}
 				err := wsConn.WriteMessage(websocket.TextMessage, []byte(msg))
 				if err != nil {
-					color.Red("[DEBUG] Error sending message from channel: %v", err)
+					if GetFlags().Debug {
+						color.Red("[DEBUG] Error sending message from channel: %v", err)
+					}
+					// Check if connection is lost and handle reconnection
+					if !handleWebSocketDisconnection(err) {
+						if GetFlags().Debug {
+							color.Red("[DEBUG] Reconnection failed, breaking out of channel message loop")
+						}
+						return
+					}
+					// If reconnection was successful, try sending the message again
+					if wsConn != nil {
+						err = wsConn.WriteMessage(websocket.TextMessage, []byte(msg))
+						if err != nil {
+							if GetFlags().Debug {
+								color.Red("[DEBUG] Error sending message after reconnection: %v", err)
+							}
+							// If it fails again, break out of the loop
+							if !handleWebSocketDisconnection(err) {
+								if GetFlags().Debug {
+									color.Red("[DEBUG] Second reconnection attempt failed, breaking out of channel message loop")
+								}
+								return
+							}
+						}
+					}
 				}
 			}
 		}
@@ -62,11 +117,14 @@ func StartWebSocket(url string) {
 		payload = fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0"}`)
 	}
 	fmt.Println(payload)
+	if GetFlags().Debug {
+		color.Red("[DEBUG] Sending WebSocket message: %s", payload)
+	}
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending WebSocket message: %v", err)
 		WsAuthenticated <- false
-		return
+		return false
 	}
 
 	// Handle initial response synchronously
@@ -74,7 +132,7 @@ func StartWebSocket(url string) {
 	if err != nil {
 		color.Red("Error reading initial WebSocket message: %v", err)
 		WsAuthenticated <- false
-		return
+		return false
 	}
 
 	var response map[string]interface{}
@@ -82,7 +140,7 @@ func StartWebSocket(url string) {
 	if err != nil {
 		color.Red("Error unmarshalling initial WebSocket message: %v", err)
 		WsAuthenticated <- false
-		return
+		return false
 	}
 
 	// If we have an insert token and the server confirms we're logged in, we're done
@@ -98,7 +156,7 @@ func StartWebSocket(url string) {
 			color.Red("[!] Invalid insert token")
 			isAuthenticated = false
 			WsAuthenticated <- false
-			return
+			return false
 		}
 	} else {
 		// Handle account linking URL
@@ -113,12 +171,18 @@ func StartWebSocket(url string) {
 				_, message, err := wsConn.ReadMessage()
 				if err != nil {
 					color.Red("Error reading WebSocket message: %v", err)
-					WsAuthenticated <- false
-					return
+					// Check if connection is lost and handle reconnection
+					if !handleWebSocketDisconnection(err) {
+						WsAuthenticated <- false
+						return
+					}
+					continue
 				}
 
 				// Print the raw message for debugging
-				color.Cyan("[DEBUG] Received WebSocket message: %s", string(message))
+				if GetFlags().Debug {
+					color.Cyan("[DEBUG] Received WebSocket message: %s", string(message))
+				}
 
 				var response map[string]interface{}
 				if err := json.Unmarshal(message, &response); err != nil {
@@ -128,7 +192,9 @@ func StartWebSocket(url string) {
 				}
 
 				// Print the parsed response for debugging
-				color.Cyan("[DEBUG] Parsed WebSocket response: %+v", response)
+				if GetFlags().Debug {
+					color.Cyan("[DEBUG] Parsed WebSocket response: %+v", response)
+				}
 
 				if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
 					if insertToken, ok := response["insert_token"].(string); ok {
@@ -174,6 +240,141 @@ func StartWebSocket(url string) {
 		// Don't send any value to WsAuthenticated - let the goroutine handle it
 		isAuthenticated = false
 	}
+
+	return true
+}
+
+// attemptWebSocketReconnection attempts to reconnect to the WebSocket with retry logic
+func attemptWebSocketReconnection(url string, maxAttempts int) bool {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		color.Yellow("[*] WebSocket reconnection attempt %d/%d", attempt, maxAttempts)
+
+		// Wait before retrying (exponential backoff)
+		if attempt > 1 {
+			waitTime := time.Duration(attempt) * 5 * time.Second
+			color.Cyan("[*] Waiting %v before retry...", waitTime)
+			time.Sleep(waitTime)
+		}
+
+		// Try to establish a basic connection first
+		dialer := websocket.Dialer{
+			HandshakeTimeout:  5 * time.Second,
+			EnableCompression: false,
+		}
+
+		var err error
+		wsConn, _, err = dialer.Dial(url, nil)
+		if err != nil {
+			color.Red("[!] WebSocket reconnection attempt %d failed: %v", attempt, err)
+			continue
+		}
+
+		color.Green("[+] WebSocket connection re-established on attempt %d", attempt)
+
+		// Re-authenticate if we have an insert key
+		if GetFlags().InsertKey != "" {
+			if reauthenticateAfterReconnection() {
+				color.Green("[+] WebSocket reconnection and re-authentication successful")
+				return true
+			} else {
+				color.Red("[!] WebSocket reconnection successful but re-authentication failed")
+				wsConn.Close()
+				wsConn = nil
+				continue
+			}
+		} else {
+			// If no insert key, just mark as authenticated (for cases where we don't need authentication)
+			isAuthenticated = true
+			color.Green("[+] WebSocket reconnection successful (no authentication required)")
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleWebSocketDisconnection handles WebSocket disconnection and attempts reconnection if search_id is provided
+func handleWebSocketDisconnection(err error) bool {
+	// Check for various types of connection errors that should trigger reconnection
+	shouldReconnect := false
+
+	// Check for WebSocket close errors
+	if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+		color.Red("WebSocket connection closed unexpectedly: %v", err)
+		shouldReconnect = true
+	}
+
+	// Check for broken pipe and other TCP connection errors
+	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "broken pipe") ||
+			strings.Contains(errStr, "connection reset") ||
+			strings.Contains(errStr, "connection refused") ||
+			strings.Contains(errStr, "network is unreachable") ||
+			strings.Contains(errStr, "no route to host") {
+			color.Red("TCP connection error detected: %v", err)
+			shouldReconnect = true
+		}
+	}
+
+	if shouldReconnect {
+		// If we have a search_id, try to reconnect
+		if GetFlags().SearchID != "" {
+			color.Yellow("[!] WebSocket connection lost. Attempting reconnection...")
+			return attemptWebSocketReconnection(wsURL, 3)
+		} else {
+			color.Red("[!] WebSocket connection lost and no search_id provided. Exiting.")
+			os.Exit(1)
+		}
+	}
+	return false
+}
+
+// reauthenticateAfterReconnection handles re-authentication after a successful reconnection
+func reauthenticateAfterReconnection() bool {
+	if wsConn == nil {
+		return false
+	}
+
+	// If we have an insert key, we can re-authenticate automatically
+	if GetFlags().InsertKey != "" {
+		payload := fmt.Sprintf(`{"event": "gh_banner", "ghVersion": "1.0.0", "insertToken": "%s"}`, GetFlags().InsertKey)
+		if GetFlags().Debug {
+			color.Red("[DEBUG] Sending re-authentication WebSocket message: %s", payload)
+		}
+		err := wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
+		if err != nil {
+			color.Red("Error sending re-authentication message: %v", err)
+			return false
+		}
+
+		// Read the response
+		_, message, err := wsConn.ReadMessage()
+		if err != nil {
+			color.Red("Error reading re-authentication response: %v", err)
+			return false
+		}
+
+		var response map[string]interface{}
+		err = json.Unmarshal(message, &response)
+		if err != nil {
+			color.Red("Error unmarshalling re-authentication response: %v", err)
+			return false
+		}
+
+		if loggedIn, ok := response["logged_in"].(bool); ok && loggedIn {
+			isAuthenticated = true
+			color.Green("[+] Re-authentication successful")
+			return true
+		} else {
+			color.Red("[!] Re-authentication failed")
+			return false
+		}
+	}
+
+	// If no insert key, we can't re-authenticate automatically
+	color.Yellow("[!] No insert key available for re-authentication")
+	return false
 }
 
 func SendMessageToWebSocket(message string) {
@@ -189,9 +390,20 @@ func SendToWebSocket(message string) {
 		return
 	}
 
+	if GetFlags().Debug {
+		color.Red("[DEBUG] Sending WebSocket message: %s", message)
+	}
 	err := wsConn.WriteMessage(websocket.TextMessage, []byte(message))
 	if err != nil {
 		color.Red("Error sending WebSocket message: %v", err)
+		// Check if connection is lost and handle reconnection
+		if handleWebSocketDisconnection(err) {
+			// If reconnection was successful, try sending the message again
+			err = wsConn.WriteMessage(websocket.TextMessage, []byte(message))
+			if err != nil {
+				color.Red("Error sending WebSocket message after reconnection: %v", err)
+			}
+		}
 	}
 }
 
@@ -215,16 +427,37 @@ func BrokerSearchCreation(query string) {
 		return
 	}
 	payload := fmt.Sprintf(`{"event": "start_search", "insertToken": "%s", "searchQuery": %s}`, GetFlags().InsertKey, escapedQuery)
+	if GetFlags().Debug {
+		color.Red("[DEBUG] Sending search WebSocket message: %s", payload)
+	}
 	err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
 	if err != nil {
 		color.Red("Error sending search message: %v", err)
-		return
+		// Check if connection is lost and handle reconnection
+		if !handleWebSocketDisconnection(err) {
+			return
+		}
+		// If reconnection was successful, try sending the message again
+		err = wsConn.WriteMessage(websocket.TextMessage, []byte(payload))
+		if err != nil {
+			color.Red("Error sending search message after reconnection: %v", err)
+			return
+		}
 	}
 
 	_, message, err := wsConn.ReadMessage()
 	if err != nil {
 		color.Red("Error reading search response: %v", err)
-		return
+		// Check if connection is lost and handle reconnection
+		if !handleWebSocketDisconnection(err) {
+			return
+		}
+		// If reconnection was successful, try reading the message again
+		_, message, err = wsConn.ReadMessage()
+		if err != nil {
+			color.Red("Error reading search response after reconnection: %v", err)
+			return
+		}
 	}
 
 	var response map[string]interface{}
@@ -253,7 +486,11 @@ func BrokerSearchCreation(query string) {
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					color.Red("WebSocket connection closed unexpectedly: %v", err)
-					return
+					// Check if we should attempt reconnection
+					if !handleWebSocketDisconnection(err) {
+						return
+					}
+					continue
 				}
 				continue
 			}
@@ -264,7 +501,17 @@ func BrokerSearchCreation(query string) {
 				if event, ok := msg["event"].(string); ok {
 					switch event {
 					case "ping":
-						wsConn.WriteMessage(websocket.TextMessage, []byte(`{"event": "pong"}`))
+						if GetFlags().Debug {
+							color.Red("[DEBUG] Sending pong WebSocket message")
+						}
+						err := wsConn.WriteMessage(websocket.TextMessage, []byte(`{"event": "pong"}`))
+						if err != nil {
+							color.Red("Error sending pong response: %v", err)
+							// Check if connection is lost and handle reconnection
+							if !handleWebSocketDisconnection(err) {
+								return
+							}
+						}
 					case "trufflehog_result":
 						// Process trufflehog results
 						if result, ok := msg["result"].(map[string]interface{}); ok {
@@ -286,11 +533,16 @@ func BrokerSearchCreation(query string) {
 							resultJSON, err := json.Marshal(result)
 							if err == nil {
 								searchID := GetFlags().SearchID
+								var resultPayload string
 								if searchID != "" {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+									resultPayload = fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON))
 								} else {
-									SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+									resultPayload = fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON))
 								}
+								if GetFlags().Debug {
+									color.Red("[DEBUG] Sending search result WebSocket message: %s", resultPayload)
+								}
+								SendMessageToWebSocket(resultPayload)
 							}
 						}
 					}
