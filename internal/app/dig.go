@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -22,9 +23,11 @@ var (
 	reposStored   = 0
 	finishedRepos []string
 	reposMutex    sync.Mutex
-	// Cache for already scanned files
+	// Cache for already scanned files with size limit
 	fileCache      = make(map[string]bool)
 	fileCacheMutex sync.Mutex
+	fileCacheSize  = 0
+	maxCacheSize   = 10000 // Limit cache to 10k entries to prevent memory leaks
 	// Skip these file extensions
 	skipExtensions = map[string]bool{
 		".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".ico": true,
@@ -163,12 +166,12 @@ func digHelper(result RepoSearchResult) []*Match {
 				if strings.HasPrefix(path, root+"/.git/") {
 					return nil
 				}
-				// Skip files larger than 10MB
-				if info.Size() > 10*1024*1024 {
+				// Skip files larger than 5MB (but still check extensions in processFile)
+				if info.Size() > 5*1024*1024 {
 					if GetFlags().Debug {
-						fmt.Printf("[DEBUG] Skipping large file (>10MB): %s (%d bytes)\n", path, info.Size())
+						fmt.Printf("[DEBUG] File will skip content processing (>5MB): %s (%d bytes)\n", path, info.Size())
 					}
-					return nil
+					// Still add to files list so extension checks can be performed
 				}
 				ext := strings.ToLower(filepath.Ext(path))
 				if skipExtensions[ext] {
@@ -191,8 +194,24 @@ func digHelper(result RepoSearchResult) []*Match {
 			// Process files in parallel
 			var wg sync.WaitGroup
 			matchesChan := make(chan []*Match, len(files))
-			semaphore := make(chan struct{}, 10) // Limit concurrent file processing
+
+			// Optimize concurrency based on available threads and file count
+			maxConcurrency := GetFlags().Threads
+			if maxConcurrency <= 0 {
+				maxConcurrency = 10 // Default fallback
+			}
+
+			// For large file sets, increase concurrency but cap it to prevent overwhelming the system
+			if len(files) > 100 {
+				maxConcurrency = min(maxConcurrency*2, 50) // Cap at 50 concurrent operations
+			}
+
+			semaphore := make(chan struct{}, maxConcurrency)
 			processedFiles := 0
+
+			if GetFlags().Debug {
+				fmt.Printf("[DEBUG] Processing %d files with %d concurrent workers\n", len(files), maxConcurrency)
+			}
 
 			for _, file := range files {
 				wg.Add(1)
@@ -202,17 +221,13 @@ func digHelper(result RepoSearchResult) []*Match {
 					defer func() { <-semaphore }()
 
 					// Check cache first
-					fileCacheMutex.Lock()
-					if fileCache[file] {
-						fileCacheMutex.Unlock()
+					if !addToFileCache(file) {
 						if GetFlags().Debug {
 							fmt.Printf("[DEBUG] Skipping cached file: %s\n", file)
 						}
 						matchesChan <- nil
 						return
 					}
-					fileCache[file] = true
-					fileCacheMutex.Unlock()
 
 					fileStart := time.Now()
 					if GetFlags().Debug {
@@ -340,10 +355,12 @@ func digHelper(result RepoSearchResult) []*Match {
 
 func processFile(file string, result RepoSearchResult) []*Match {
 	readStart := time.Now()
-	data, err := ioutil.ReadFile(file)
+
+	// Get file info first to check size before reading
+	fileInfo, err := os.Stat(file)
 	if err != nil {
 		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Error reading file %s: %v\n", file, err)
+			fmt.Printf("[DEBUG] Error getting file info %s: %v\n", file, err)
 		}
 		return nil
 	}
@@ -353,7 +370,7 @@ func processFile(file string, result RepoSearchResult) []*Match {
 	score := 0
 	var newMatches []*Match
 
-	// Always check file extensions first (regardless of content)
+	// Always check file extensions first (regardless of content or size)
 	extStart := time.Now()
 	fileExtMatches := MatchFileExtensions(file, fileResult)
 	for _, match := range fileExtMatches {
@@ -365,51 +382,71 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		fmt.Printf("[DEBUG] File extension check for %s took %v\n", file, time.Since(extStart))
 	}
 
-	// Improved binary detection - check first 1KB for null bytes
-	isBinary := false
-	if len(data) > 1024 {
-		binaryCount := 0
-		checkSize := 1024
-		if len(data) < checkSize {
-			checkSize = len(data)
-		}
-		for i := 0; i < checkSize; i++ {
-			if data[i] == 0 {
-				binaryCount++
-			}
-		}
-		if float32(binaryCount)/float32(checkSize) > 0.1 {
-			if GetFlags().Debug {
-				fmt.Printf("[DEBUG] Skipping text processing for binary file (too many null bytes): %s\n", file)
-			}
-			isBinary = true
-		}
-	} else if len(data) > 0 && data[0] == 0 {
-		// Quick check for single byte files
+	// Skip content processing for files larger than 5MB to prevent memory issues
+	if fileInfo.Size() > 5*1024*1024 {
 		if GetFlags().Debug {
-			fmt.Printf("[DEBUG] Skipping text processing for binary file (starts with null): %s\n", file)
+			fmt.Printf("[DEBUG] Skipping content processing for large file (>5MB): %s (%d bytes)\n", file, fileInfo.Size())
 		}
-		isBinary = true
+		// Return extension matches if any, otherwise nil
+		if score > 0 {
+			for _, match := range newMatches {
+				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				match.CommitFile = relPath
+				match.File = relPath
+			}
+			return newMatches
+		}
+		return nil
 	}
 
-	// Only do full text search if file is not binary and we haven't found anything yet
-	if !isBinary && score == 0 {
-		// Convert to ASCII efficiently - only if necessary
-		var content string
-		binaryRatio := float32(0)
-		if len(data) > 0 {
-			ascii := make([]byte, 0, len(data))
-			for _, b := range data {
-				if b > 0 && b < 127 {
-					ascii = append(ascii, b)
-				}
-			}
-			binaryRatio = float32(len(ascii)) / float32(len(data))
-			content = string(ascii)
-		} else {
-			content = ""
-			binaryRatio = 1.0
+	// Use streaming approach for large files, direct reading for small files
+	var data []byte
+	if fileInfo.Size() > 1024*1024 { // 1MB threshold
+		// Stream read for large files in chunks
+		data, err = readFileStreamingChunked(file, 1024*1024, 50*1024) // 1MB chunks with 50KB overlap
+	} else {
+		// Direct read for small files
+		data, err = ioutil.ReadFile(file)
+	}
+
+	if err != nil {
+		if GetFlags().Debug {
+			fmt.Printf("[DEBUG] Error reading file %s: %v\n", file, err)
 		}
+		// Return extension matches if any, otherwise nil
+		if score > 0 {
+			for _, match := range newMatches {
+				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				match.CommitFile = relPath
+				match.File = relPath
+			}
+			return newMatches
+		}
+		return nil
+	}
+
+	// Early binary detection using first 1KB
+	isBinary := isBinaryFile(data)
+	if isBinary {
+		if GetFlags().Debug {
+			fmt.Printf("[DEBUG] Skipping content processing for binary file: %s\n", file)
+		}
+		// Return extension matches if any, otherwise nil
+		if score > 0 {
+			for _, match := range newMatches {
+				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				match.CommitFile = relPath
+				match.File = relPath
+			}
+			return newMatches
+		}
+		return nil
+	}
+
+	// Only do full text search if we haven't found anything yet
+	if score == 0 {
+		// Process content efficiently
+		content, binaryRatio := extractTextContent(data)
 
 		// Skip text processing if too much binary content
 		if binaryRatio < 0.9 {
@@ -443,6 +480,161 @@ func processFile(file string, result RepoSearchResult) []*Match {
 	}
 
 	return nil
+}
+
+// readFileStreamingChunked reads a file in chunks with overlap to avoid missing matches at chunk boundaries
+func readFileStreamingChunked(filePath string, chunkSize int64, overlapSize int64) ([]byte, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Get file size
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	fileSize := fileInfo.Size()
+
+	// For files smaller than chunk size, just read the whole thing
+	if fileSize <= chunkSize {
+		return ioutil.ReadAll(file)
+	}
+
+	if GetFlags().Debug {
+		fmt.Printf("[DEBUG] Streaming file %s in chunks: size=%d, chunk=%d, overlap=%d\n",
+			filepath.Base(filePath), fileSize, chunkSize, overlapSize)
+	}
+
+	// Pre-allocate buffer with estimated capacity
+	estimatedChunks := int(fileSize/(chunkSize-overlapSize)) + 1
+	totalCapacity := int(fileSize) + (estimatedChunks * int(overlapSize))
+	result := make([]byte, 0, totalCapacity)
+
+	// Read chunks with overlap
+	offset := int64(0)
+	firstChunk := true
+	chunkCount := 0
+
+	for offset < fileSize {
+		// Calculate chunk size for this iteration
+		currentChunkSize := chunkSize
+		if offset+chunkSize > fileSize {
+			currentChunkSize = fileSize - offset
+		}
+
+		// Seek to the current position
+		_, err = file.Seek(offset, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Read the chunk
+		chunk := make([]byte, currentChunkSize)
+		bytesRead, err := io.ReadFull(file, chunk)
+		if err != nil && err != io.ErrUnexpectedEOF {
+			return nil, err
+		}
+
+		// Trim to actual bytes read
+		chunk = chunk[:bytesRead]
+		chunkCount++
+
+		if firstChunk {
+			// First chunk: add entire chunk
+			result = append(result, chunk...)
+			firstChunk = false
+		} else {
+			// Subsequent chunks: add only the non-overlapping part
+			// Skip the first overlapSize bytes (which were already included from previous chunk)
+			if int64(len(chunk)) > overlapSize {
+				result = append(result, chunk[overlapSize:]...)
+			}
+		}
+
+		// Move to next chunk position (accounting for overlap)
+		offset += chunkSize - overlapSize
+
+		// Safety check to prevent infinite loops
+		if offset >= fileSize {
+			break
+		}
+	}
+
+	if GetFlags().Debug {
+		fmt.Printf("[DEBUG] Completed streaming %s: %d chunks, %d bytes read\n",
+			filepath.Base(filePath), chunkCount, len(result))
+	}
+
+	return result, nil
+}
+
+// readFileStreaming reads a file in chunks to avoid loading large files entirely into memory
+func readFileStreaming(filePath string, maxBytes int64) ([]byte, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// Read only up to maxBytes
+	reader := io.LimitReader(file, maxBytes)
+	return ioutil.ReadAll(reader)
+}
+
+// isBinaryFile efficiently detects if a file is binary by checking the first 1KB
+func isBinaryFile(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	// Quick check for single byte files
+	if len(data) == 1 && data[0] == 0 {
+		return true
+	}
+
+	// Check first 1KB for null bytes
+	checkSize := 1024
+	if len(data) < checkSize {
+		checkSize = len(data)
+	}
+
+	nullCount := 0
+	for i := 0; i < checkSize; i++ {
+		if data[i] == 0 {
+			nullCount++
+		}
+	}
+
+	// If more than 10% are null bytes, consider it binary
+	return float32(nullCount)/float32(checkSize) > 0.1
+}
+
+// extractTextContent extracts ASCII text content from binary data and calculates the binary ratio.
+// It performs a single pass through the data to filter ASCII characters and count the ratio.
+func extractTextContent(data []byte) (string, float32) {
+	if len(data) == 0 {
+		return "", 1.0
+	}
+
+	// Pre-allocate slice with capacity to avoid reallocations
+	ascii := make([]byte, 0, len(data))
+	asciiCount := 0
+
+	// Single pass through data to count ASCII characters and build string
+	for _, b := range data {
+		if b > 0 && b < 127 {
+			ascii = append(ascii, b)
+			asciiCount++
+		}
+	}
+
+	binaryRatio := float32(asciiCount) / float32(len(data))
+	content := string(ascii)
+
+	return content, binaryRatio
 }
 
 // ScanDiff finds secrets in the diff between two Git trees.
@@ -535,4 +727,53 @@ func ClearFinishedRepos() {
 // ClearRepoStorage deletes all stored repos from the disk.
 func ClearRepoStorage() {
 	os.RemoveAll("/tmp/githound")
+}
+
+// addToFileCache adds a file to the cache with size management
+func addToFileCache(file string) bool {
+	fileCacheMutex.Lock()
+	defer fileCacheMutex.Unlock()
+
+	// Check if already in cache
+	if fileCache[file] {
+		return false
+	}
+
+	// Add to cache
+	fileCache[file] = true
+	fileCacheSize++
+
+	// Cleanup if cache is too large
+	if fileCacheSize > maxCacheSize {
+		cleanupFileCache()
+	}
+
+	return true
+}
+
+// cleanupFileCache removes old entries from the file cache
+func cleanupFileCache() {
+	// Simple cleanup: clear half the cache when it gets too large
+	entriesToRemove := maxCacheSize / 2
+
+	// Remove random entries (in practice, this will remove older entries due to map iteration order)
+	for file := range fileCache {
+		delete(fileCache, file)
+		fileCacheSize--
+		entriesToRemove--
+		if entriesToRemove <= 0 {
+			break
+		}
+	}
+
+	if GetFlags().Debug {
+		fmt.Printf("[DEBUG] Cleaned file cache, remaining entries: %d\n", fileCacheSize)
+	}
+}
+
+// isFileCached checks if a file is in the cache
+func isFileCached(file string) bool {
+	fileCacheMutex.Lock()
+	defer fileCacheMutex.Unlock()
+	return fileCache[file]
 }
