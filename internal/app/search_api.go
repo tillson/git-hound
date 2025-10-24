@@ -51,10 +51,13 @@ func SearchWithAPI(queries []string) {
 	if err != nil {
 		if strings.Contains(err.Error(), "401") {
 			color.Red("[!] Invalid GitHub access token. Please check that your token is correct and has the necessary permissions.")
+			os.Exit(1)
+		} else if strings.Contains(err.Error(), "403") && strings.Contains(err.Error(), "rate reset in") {
+			color.Yellow("[!] Rate limited by GitHub. Scans may be slower...")
 		} else {
 			color.Red("[!] Error authenticating with GitHub: %v", err)
+			os.Exit(1)
 		}
-		os.Exit(1)
 	}
 
 	if !GetFlags().ResultsOnly && !GetFlags().JsonOutput && GetFlags().Debug {
