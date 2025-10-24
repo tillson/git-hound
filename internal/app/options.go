@@ -16,6 +16,7 @@ type Flags struct {
 	NoFiles           bool
 	NoKeywords        bool
 	AllResults        bool
+	MatchQuery        bool
 	FastMode          bool
 	Threads           int
 	Debug             bool

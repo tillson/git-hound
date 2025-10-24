@@ -75,6 +75,265 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			color.New(color.Faint).Println("[" + repo.File + "]")
 			color.New(color.Faint).Println(repo.Contents)
 		}
+	} else if GetFlags().MatchQuery {
+		// Handle match-query mode - still perform regex processing but also return query context
+		// Get pointer matches using the same regex processing as normal mode
+		matches, score := GetMatchesForString(repo.Contents, repo, true)
+
+		// Process potential additional matches from digging
+		if (GetFlags().DigCommits || GetFlags().DigRepo) && RepoIsUnpopular(client, repo) && score > -1 {
+			// Lock the map for thread-safe access
+			mapMutex.Lock()
+			repoAlreadyScanned := scannedRepos[repo.Repo]
+			if !repoAlreadyScanned {
+				scannedRepos[repo.Repo] = true
+			}
+			mapMutex.Unlock()
+
+			if !repoAlreadyScanned {
+				regex := regexp.MustCompile("(?i)(alexa|urls|adblock|domain|dns|top1000|top\\-1000|httparchive" +
+					"|blacklist|hosts|ads|whitelist|crunchbase|tweets|tld|hosts\\.txt" +
+					"|host\\.txt|aquatone|recon\\-ng|hackerone|bugcrowd|xtreme|list|tracking|malicious|ipv(4|6)|host\\.txt)")
+				fileNameMatches := regex.FindAllString(repo.Repo, -1)
+				if len(fileNameMatches) == 0 {
+					// Get additional matches from Dig function
+					dig_matches := Dig(repo)
+					for _, match := range dig_matches {
+						// Add the dig-files attribute directly to the pointer match
+						match.Attributes = append(match.Attributes, "dig-files")
+
+						// Add to matches - no need to copy since Dig now returns []*Match
+						matches = append(matches, match)
+					}
+				}
+			}
+		}
+
+		// Fetch GitHub API info about the repo
+		token := GetFlags().GithubAccessToken
+		client := github.NewClient(nil).WithAuthToken(token)
+		if client != nil {
+			owner := strings.Split(repo.Repo, "/")[0]
+			repoName := strings.Split(repo.Repo, "/")[1]
+			TrackAPIRequest("ListCommits", fmt.Sprintf("Owner: %s, Repo: %s, Path: %s", owner, repoName, repo.File))
+			commits, _, err := client.Repositories.ListCommits(context.Background(), owner, repoName, &github.CommitsListOptions{
+				Path: repo.File,
+			})
+			if err != nil {
+				fmt.Println(err)
+				repo.SourceFileLastUpdated = ""
+			} else {
+				repo.SourceFileLastUpdated = commits[0].Commit.Author.Date.String()
+				repo.SourceFileLastAuthorEmail = *commits[0].Commit.Author.Email
+			}
+		}
+
+		resultRepoURL := GetRepoURLForSearchResult(repo)
+
+		// If we found regex matches, process them normally but add query context
+		if len(matches) > 0 {
+			i := 0
+			for _, result := range matches {
+				// Create the result payload
+				resultPayload := map[string]interface{}{
+					"repo":              resultRepoURL,
+					"context":           result.Line.Text,
+					"match":             result.Line.Text[result.Line.MatchIndex:result.Line.MatchEndIndex],
+					"attributes":        append(result.Attributes, "query: "+repo.Query), // Add query context to attributes
+					"file_last_updated": repo.SourceFileLastUpdated,
+					"file_last_author":  repo.SourceFileLastAuthorEmail,
+					"url":               GetResultLink(repo, result),
+				}
+
+				// For dug matches, update the file information while maintaining the structure
+				if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+					resultPayload["file"] = result.File
+					// Extract the base URL and commit hash from the original URL
+					baseURL := strings.Split(repo.URL, "/blob/")[0]
+					commitHash := strings.Split(repo.URL, "/blob/")[1]
+					commitHash = strings.Split(commitHash, "/")[0]
+					// Construct new URL with the file path from result.File
+					resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+				}
+
+				// Use mutex to protect access to uniqueMatches map
+				matchKey := fmt.Sprintf("%s|%s", resultPayload["match"], resultRepoURL)
+				// For dig-files matches, include the file path in the deduplication key
+				if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+					matchKey = fmt.Sprintf("%s|%s|%s", resultPayload["match"], resultRepoURL, result.File)
+				}
+				mapMutex.Lock()
+				isDuplicate := uniqueMatches[matchKey]
+				if !isDuplicate {
+					uniqueMatches[matchKey] = true
+				}
+				mapMutex.Unlock()
+
+				if isDuplicate {
+					continue
+				}
+
+				if i == 0 {
+					if !GetFlags().ResultsOnly && !GetFlags().JsonOutput {
+						color.Green("[" + resultRepoURL + "]")
+					}
+				}
+				i += 1
+				if GetFlags().ResultsOnly {
+					fmt.Println(result.Text)
+				} else {
+					if GetFlags().JsonOutput {
+						a, _ := json.Marshal(resultPayload)
+						fmt.Println(string(a))
+					} else {
+						PrintContextLine(result.Line)
+						PrintPatternLine(result)
+						PrintAttributes(result)
+						// Always print the file path
+						if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+							color.New(color.Faint).Println("file:     " + result.File)
+							// Construct URL for dig-files matches
+							baseURL := strings.Split(repo.URL, "/blob/")[0]
+							commitHash := strings.Split(repo.URL, "/blob/")[1]
+							commitHash = strings.Split(commitHash, "/")[0]
+							digURL := fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+							color.New(color.Faint).Println(digURL)
+						} else {
+							color.New(color.Faint).Println("file:     " + repo.File)
+							color.New(color.Faint).Println(GetResultLink(repo, result))
+						}
+						// Add query context to output
+						color.New(color.Faint).Println("query:    " + repo.Query)
+					}
+				}
+				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
+					resultJSON, err := json.Marshal(resultPayload)
+					if err == nil {
+						searchID := GetFlags().SearchID
+						if searchID != "" {
+							if GetFlags().Trufflehog {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
+							} else {
+								escapedQuery, _ := json.Marshal(repo.Query)
+								// For dig-files matches, ensure the file path and URL are correctly set
+								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+									resultPayload["file"] = result.File
+									baseURL := strings.Split(repo.URL, "/blob/")[0]
+									commitHash := strings.Split(repo.URL, "/blob/")[1]
+									commitHash = strings.Split(commitHash, "/")[0]
+									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+									resultJSON, _ = json.Marshal(resultPayload)
+								}
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
+							}
+						} else {
+							if GetFlags().Trufflehog {
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
+							} else {
+								escapedQuery, _ := json.Marshal(repo.Query)
+								// For dig-files matches, ensure the file path and URL are correctly set
+								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+									resultPayload["file"] = result.File
+									baseURL := strings.Split(repo.URL, "/blob/")[0]
+									commitHash := strings.Split(repo.URL, "/blob/")[1]
+									commitHash = strings.Split(commitHash, "/")[0]
+									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+									resultJSON, _ = json.Marshal(resultPayload)
+								}
+								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
+							}
+						}
+					} else {
+						color.Red("Error marshalling result to JSON: %v", err)
+					}
+				}
+			}
+			if GetFlags().Debug {
+				fmt.Println("Finished scanning " + repo.Repo + "...")
+			}
+
+			// Clean up the matches by returning them to the pool
+			PutMatches(matches)
+		} else {
+			searchContext := ""
+			matchText := ""
+
+			// Use TextMatches from GitHub API if available for better context
+			if len(repo.TextMatches) > 0 {
+				// Use the first text match for context and match text
+				textMatch := repo.TextMatches[0]
+				searchContext = textMatch.GetFragment()
+				// Get the first match text from the matches array
+				if len(textMatch.Matches) > 0 {
+					matchText = textMatch.Matches[0].GetText()
+				} else {
+					matchText = fmt.Sprintf("Search query match: %s", repo.Query)
+				}
+			} else {
+				// Fallback to file content if no TextMatches available
+				if len(repo.Contents) > 200 {
+					// If file is large, show first 200 chars as context
+					searchContext = fmt.Sprintf("%s...", repo.Contents[:200])
+				} else {
+					// If file is small, show full content
+					searchContext = fmt.Sprintf("%s", repo.Contents)
+				}
+				matchText = fmt.Sprintf("Search query match: %s", repo.Query)
+			}
+
+			resultPayload := map[string]interface{}{
+				"repo":              resultRepoURL,
+				"context":           searchContext,
+				"match":             matchText,
+				"attributes":        []string{"Initial Query Match", "query: " + repo.Query},
+				"file_last_updated": repo.SourceFileLastUpdated,
+				"file_last_author":  repo.SourceFileLastAuthorEmail,
+				"url":               repo.URL,
+			}
+
+			if GetFlags().JsonOutput {
+				a, _ := json.Marshal(resultPayload)
+				fmt.Println(string(a))
+			} else {
+				if !GetFlags().ResultsOnly {
+					color.Green("[" + resultRepoURL + "]")
+				}
+				if GetFlags().ResultsOnly {
+					// Show the matched text from TextMatches if available, otherwise show file content
+					if len(repo.TextMatches) > 0 && len(repo.TextMatches[0].Matches) > 0 {
+						fmt.Println(repo.TextMatches[0].Matches[0].GetText())
+					} else {
+						fmt.Println(repo.Contents)
+					}
+				} else {
+					color.New(color.Faint).Println("file:     " + repo.File)
+					color.New(color.Faint).Println("query:    " + repo.Query)
+					// Show the fragment from TextMatches if available, otherwise show file content
+					if len(repo.TextMatches) > 0 {
+						color.New(color.Faint).Println(repo.TextMatches[0].GetFragment())
+					} else {
+						color.New(color.Faint).Println(repo.Contents)
+					}
+				}
+			}
+
+			// Handle dashboard mode if enabled
+			if GetFlags().Dashboard && GetFlags().InsertKey != "" {
+				resultJSON, err := json.Marshal(resultPayload)
+				if err == nil {
+					searchID := GetFlags().SearchID
+					if searchID != "" {
+						escapedQuery, _ := json.Marshal(repo.Query)
+						SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
+					} else {
+						escapedQuery, _ := json.Marshal(repo.Query)
+						SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
+					}
+				} else {
+					color.Red("Error marshalling result to JSON: %v", err)
+				}
+			}
+		}
 	} else {
 		// Get pointer matches
 		matches, score := GetMatchesForString(repo.Contents, repo, true)

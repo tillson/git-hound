@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/google/go-github/v57/github"
 	"github.com/spf13/viper"
 )
 
@@ -28,6 +29,7 @@ type RepoSearchResult struct {
 	URL                       string
 	SourceFileLastUpdated     string
 	SourceFileLastAuthorEmail string
+	TextMatches               []*github.TextMatch
 	searchOptions             *SearchOptions
 }
 

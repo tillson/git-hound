@@ -68,6 +68,11 @@ func SearchWithAPI(queries []string) {
 		},
 	}
 
+	// Enable text match metadata when in match-query mode
+	if GetFlags().MatchQuery {
+		options.TextMatch = true
+	}
+
 	http_client := http.Client{}
 	rt := WithHeader(http_client.Transport)
 	rt.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36")
@@ -79,16 +84,20 @@ func SearchWithAPI(queries []string) {
 			if GetFlags().Debug {
 				TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d", query, page))
 			}
+
 			result, _, err := client.Search.Code(context.Background(), query, &options)
+			// fmt.Println(result)
 			for err != nil {
-				fmt.Println(err)
+				// fmt.Println(err)
 				if strings.Contains(err.Error(), "ERROR_TYPE_QUERY_PARSING_FATAL") {
 					color.Red("[!] Invalid query: %s (maybe you need to use quotes?)", query)
 					os.Exit(1)
 				}
 				resetTime := extractResetTime(err.Error())
 				sleepDuration := resetTime + 3
-				color.Yellow("[!] GitHub API rate limit exceeded. Waiting %d seconds...", sleepDuration)
+				if !GetFlags().JsonOutput {
+					color.Yellow("[!] GitHub API rate limit exceeded. Waiting %d seconds...", sleepDuration)
+				}
 				time.Sleep(time.Duration(sleepDuration) * time.Second)
 				if GetFlags().Debug {
 					TrackAPIRequest("Search.Code", fmt.Sprintf("Query: %s, Page: %d (retry)", query, page))
@@ -124,12 +133,13 @@ func SearchWithAPI(queries []string) {
 
 				// Create a repo result object to pass to the worker
 				repoResult := RepoSearchResult{
-					Repo:   author_repo_str,
-					File:   code_result.GetPath(),
-					Raw:    author_repo_str + "/" + sha + "/" + code_result.GetPath(),
-					Source: "repo",
-					Query:  query,
-					URL:    "https://github.com/" + author_repo_str + "/blob/" + sha + "/" + code_result.GetPath(),
+					Repo:        author_repo_str,
+					File:        code_result.GetPath(),
+					Raw:         author_repo_str + "/" + sha + "/" + code_result.GetPath(),
+					Source:      "repo",
+					Query:       query,
+					URL:         "https://github.com/" + author_repo_str + "/blob/" + sha + "/" + code_result.GetPath(),
+					TextMatches: code_result.TextMatches,
 				}
 
 				// Increment the wait group before submitting the job
