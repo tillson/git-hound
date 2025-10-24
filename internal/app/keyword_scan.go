@@ -206,6 +206,7 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 						color.New(color.Faint).Println("query:    " + repo.Query)
 					}
 				}
+
 				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
 					resultJSON, err := json.Marshal(resultPayload)
 					if err == nil {
@@ -463,42 +464,36 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 						}
 					}
 				}
+
+				// Handle dashboard mode for match-query results
 				if GetFlags().Dashboard && GetFlags().InsertKey != "" {
 					resultJSON, err := json.Marshal(resultPayload)
 					if err == nil {
 						searchID := GetFlags().SearchID
 						if searchID != "" {
-							if GetFlags().Trufflehog {
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s}`, GetFlags().InsertKey, searchID, string(resultJSON)))
-							} else {
-								escapedQuery, _ := json.Marshal(repo.Query)
-								// For dig-files matches, ensure the file path and URL are correctly set
-								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
-									resultPayload["file"] = result.File
-									baseURL := strings.Split(repo.URL, "/blob/")[0]
-									commitHash := strings.Split(repo.URL, "/blob/")[1]
-									commitHash = strings.Split(commitHash, "/")[0]
-									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
-									resultJSON, _ = json.Marshal(resultPayload)
-								}
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
+							escapedQuery, _ := json.Marshal(repo.Query)
+							// For dig-files matches, ensure the file path and URL are correctly set
+							if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+								resultPayload["file"] = result.File
+								baseURL := strings.Split(repo.URL, "/blob/")[0]
+								commitHash := strings.Split(repo.URL, "/blob/")[1]
+								commitHash = strings.Split(commitHash, "/")[0]
+								resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+								resultJSON, _ = json.Marshal(resultPayload)
 							}
+							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "searchID": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, searchID, string(resultJSON), string(escapedQuery)))
 						} else {
-							if GetFlags().Trufflehog {
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s}`, GetFlags().InsertKey, string(resultJSON)))
-							} else {
-								escapedQuery, _ := json.Marshal(repo.Query)
-								// For dig-files matches, ensure the file path and URL are correctly set
-								if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
-									resultPayload["file"] = result.File
-									baseURL := strings.Split(repo.URL, "/blob/")[0]
-									commitHash := strings.Split(repo.URL, "/blob/")[1]
-									commitHash = strings.Split(commitHash, "/")[0]
-									resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
-									resultJSON, _ = json.Marshal(resultPayload)
-								}
-								SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
+							escapedQuery, _ := json.Marshal(repo.Query)
+							// For dig-files matches, ensure the file path and URL are correctly set
+							if len(result.Attributes) > 0 && result.Attributes[0] == "dig-files" {
+								resultPayload["file"] = result.File
+								baseURL := strings.Split(repo.URL, "/blob/")[0]
+								commitHash := strings.Split(repo.URL, "/blob/")[1]
+								commitHash = strings.Split(commitHash, "/")[0]
+								resultPayload["url"] = fmt.Sprintf("%s/blob/%s/%s", baseURL, commitHash, result.File)
+								resultJSON, _ = json.Marshal(resultPayload)
 							}
+							SendMessageToWebSocket(fmt.Sprintf(`{"event": "search_result", "insertToken": "%s", "result": %s, "search_term": %s}`, GetFlags().InsertKey, string(resultJSON), string(escapedQuery)))
 						}
 					} else {
 						color.Red("Error marshalling result to JSON: %v", err)
