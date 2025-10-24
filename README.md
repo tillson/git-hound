@@ -1,26 +1,43 @@
-# GitHound
+<div align="center">
 
-A pattern-matching, patch-attacking, batch-catching secret snatcher.
+<img src="assets/logo.png" width="120" alt="GitHound Logo"/>
+
+# 🐾 GitHound  
+### _A pattern-matching, patch-attacking, batch-catching secret snatcher._
+
+[![GitHub release](https://img.shields.io/github/v/release/tillson/git-hound?color=brightgreen&style=for-the-badge)](https://github.com/tillson/git-hound/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tillson/git-hound?style=for-the-badge)](https://goreportcard.com/report/github.com/tillson/git-hound)
+[![License](https://img.shields.io/github/license/tillson/git-hound?style=for-the-badge)](LICENSE)
+
+</div>
 
 
-🚀 New in v3.0.0! Try the GitHound Web Dashboard  
+## Overview
+
+GitHound hunts down **exposed API keys, secrets, and credentials** across GitHub by pairing GitHub dorks with pattern matching, contextual detection, and commit-history analysis. Input a [GitHub dork](https://githoundexplore.com/github-dorks) into GitHound, and it will scan any files and repos that match your query for secrets. Unlike typical scanners, **GitHound leverages GitHub’s Code Search API**, which gives you full visibility across *all* public repositories, not just a few targets. More information is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
+
+---
+
+
+## New in 3.0
 Visualize and manage your search results in real-time with the new GitHound Explore dashboard.  Get started now for free at https://githoundexplore.com or by using the `--dashboard` flag. Learn how to use this with a local installation of GitHound or TruffleHog at the [Wiki page](https://github.com/tillson/git-hound/wiki/GitHound-Explore-%E2%80%93%C2%A0UI-for-result-filtering-&-cloud-scans). Keep in mind you can still use GitHound without the dashboard.
 
+We've also started a **GitHub Dorks Database**, where you can browse and search dorks for various API keywords and get ideas for new dorks! Check it out at https://githoundexplore.com/github-dorks.
 
-
-![GitHound](assets/logo.png)
-
-GitHound hunts down exposed API keys and other sensitive information on GitHub using GitHub code search, pattern matching, and commit history searching. Unlike other secret-finding tools, GitHound's use of of GitHub code search enables it to search all of GitHub and isn't limited to specific repos, users, or orgs.
-More information is available in the [accompanying blog post](https://tillsongalloway.com/finding-sensitive-information-on-github/).
 
 ## Features
 
-- GitHub/Gist code search. This enables GitHound to locate sensitive information exposed across all of GitHub, uploaded by any user.
-- Sensitive data detection using pattern matching, contextual information, and string entropy
-- Commit history digging to find improperly deleted sensitive information
-- Scoring system that filters common false positives and optimizes intensive repo digging
-- Base64 detection and decoding
-- Options to build GitHound into larger systems, including JSON output and custom regexes
+🔍 Global GitHub Search – find secrets across all of GitHub, including Gists
+
+🔑 Smart API Key Detection – regex + entropy + context matching
+
+🕵️ Commit History Digging – uncover deleted or reverted credentials
+
+🧮 Adaptive Scoring – filters out false positives
+
+🧰 Base64 decoding and encoded secret extraction
+
+💻 JSON output & custom regex rules for automation pipelines
 
 ## Usage
 
@@ -40,12 +57,6 @@ Alternatively, you can use environment variables, which will override values in 
 - `GITHOUND_GITHUB_TOKEN`: Sets the GitHub API access token.
 - `GITHOUND_INSERT_KEY`: Sets the GitHoundExplore Insert Key for the `--dashboard` feature.
 
-### Two-Factor Authentication
-
-If GitHound is logged into your GitHub account, two-factor authentication may kick in. You can pass 2FA codes to GitHound with `--otp-code`.
-Otherwise, GitHound will prompt you for it when it starts up.
-You can also [supply your 2FA seed](https://github.com/tillson/git-hound/pull/24) in the config and you'll never have to worry about 2FA again.
-Grab the 2FA seed by decoding the barcode that GitHub shows during the 2FA setup process.
 
 ## API Key Regexes
 GitHound utilizes a database of API key regexes maintained by the [Gitleaks](https://github.com/zricethezav/gitleaks) authors.
@@ -166,3 +177,9 @@ Replace `/path/to/config.yaml` with the actual path to your `config.yaml` file. 
 ## References
 
 - [How Bad Can It Git? Characterizing Secret Leakage in Public GitHub Repositories (Meli, McNiece, Reaves)](https://www.ndss-symposium.org/wp-content/uploads/2019/02/ndss2019_04B-3_Meli_paper.pdf)
+
+---
+
+<div align="center">
+If you like GitHound, consider ⭐ starring the repo!
+</div> ```
