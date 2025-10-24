@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
-	"github.com/google/go-github/v57/github"
 )
 
 // ResultScan is the final scan result.
@@ -109,24 +107,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 			}
 		}
 
-		// Fetch GitHub API info about the repo
-		token := GetFlags().GithubAccessToken
-		client := github.NewClient(nil).WithAuthToken(token)
-		if client != nil {
-			owner := strings.Split(repo.Repo, "/")[0]
-			repoName := strings.Split(repo.Repo, "/")[1]
-			TrackAPIRequest("ListCommits", fmt.Sprintf("Owner: %s, Repo: %s, Path: %s", owner, repoName, repo.File))
-			commits, _, err := client.Repositories.ListCommits(context.Background(), owner, repoName, &github.CommitsListOptions{
-				Path: repo.File,
-			})
-			if err != nil {
-				fmt.Println(err)
-				repo.SourceFileLastUpdated = ""
-			} else {
-				repo.SourceFileLastUpdated = commits[0].Commit.Author.Date.String()
-				repo.SourceFileLastAuthorEmail = *commits[0].Commit.Author.Email
-			}
-		}
+		// Commit info is now populated by git-based approach in search_api.go
+		// No need for GitHub API calls here
 
 		resultRepoURL := GetRepoURLForSearchResult(repo)
 
@@ -370,26 +352,8 @@ func ScanAndPrintResult(client *http.Client, repo RepoSearchResult) {
 
 		// Process and display matches
 		if len(matches) > 0 {
-			// Fetch GitHub API info about the repo
-			token := GetFlags().GithubAccessToken
-			client := github.NewClient(nil).WithAuthToken(token)
-			if client != nil {
-				// gh_repo_obj, _, err := client.Repositories.Get(strings.Split(repo.Repo, "/")[0], strings.Split(repo.Repo, "/")[1])
-				// get repo's commits
-				owner := strings.Split(repo.Repo, "/")[0]
-				repoName := strings.Split(repo.Repo, "/")[1]
-				TrackAPIRequest("ListCommits", fmt.Sprintf("Owner: %s, Repo: %s, Path: %s", owner, repoName, repo.File))
-				commits, _, err := client.Repositories.ListCommits(context.Background(), owner, repoName, &github.CommitsListOptions{
-					Path: repo.File,
-				})
-				if err != nil {
-					fmt.Println(err)
-					repo.SourceFileLastUpdated = ""
-				} else {
-					repo.SourceFileLastUpdated = commits[0].Commit.Author.Date.String()
-					repo.SourceFileLastAuthorEmail = *commits[0].Commit.Author.Email
-				}
-			}
+			// Commit info is now populated by git-based approach in search_api.go
+			// No need for GitHub API calls here
 
 			resultRepoURL := GetRepoURLForSearchResult(repo)
 			i := 0
