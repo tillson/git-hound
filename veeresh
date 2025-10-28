@@ -1,0 +1,17 @@
+d = {'a': 1, 'b': 2, 'c': 3}
+
+d_clear = d.copy()
+d_clear.clear()                # Empties the dictionary
+d_copy = d.copy()              # Copies the dictionary
+keys = ['a', 'b', 'c']
+from_keys_dict = dict.fromkeys(keys, 0)  # New dict from keys
+get_b = d.get('b')             # Returns 2
+get_z = d.get('z', 'Not Found')# Returns default if key missing
+items = d.items()
+keys_view = d.keys()
+pop_a = d.pop('a')             # Removes 'a':1
+pop_item = d.popitem()         # Removes and returns last item
+setdefault_d = d.setdefault('d', 4) # Adds 'd':4 if not present
+update_dict = {'e': 5}
+d.update(update_dict)          # Adds 'e':5
+values = d.values()
