@@ -182,4 +182,4 @@ Replace `/path/to/config.yaml` with the actual path to your `config.yaml` file. 
 
 <div align="center">
 If you like GitHound, consider ⭐ starring the repo!
-</div> ```
+</div>
