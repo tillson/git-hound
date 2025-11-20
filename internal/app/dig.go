@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -140,6 +141,12 @@ func digHelper(result RepoSearchResult) []*Match {
 			return matches
 		}
 
+		// Extract HEAD commit hash for use in file-based matches
+		headCommit := ref.Hash().String()
+		if GetFlags().Debug {
+			fmt.Printf("[DEBUG] Cloned repo HEAD commit: %s\n", headCommit)
+		}
+
 		if GetFlags().DigRepo {
 			scanStart := time.Now()
 			root := "/tmp/githound/" + result.Repo
@@ -150,6 +157,13 @@ func digHelper(result RepoSearchResult) []*Match {
 
 			err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
+					// If the file/directory doesn't exist (e.g., deleted during walk), skip it
+					if os.IsNotExist(err) {
+						if GetFlags().Debug {
+							fmt.Printf("[DEBUG] Skipping non-existent path during walk: %s\n", path)
+						}
+						return nil
+					}
 					return err
 				}
 				if info.IsDir() {
@@ -251,6 +265,10 @@ func digHelper(result RepoSearchResult) []*Match {
 				processedFiles++
 				if fileMatches != nil {
 					for _, match := range fileMatches {
+						// Set the HEAD commit hash on all file-based matches
+						// This ensures URLs point to the correct commit
+						match.Commit = headCommit
+
 						// For dug files, we want to show each file separately
 						// Only deduplicate exact matches from the same file
 						matchKey := fmt.Sprintf("%s|%s|%s", match.Text, match.File, match.Line.Text)
@@ -315,8 +333,14 @@ func digHelper(result RepoSearchResult) []*Match {
 					return err
 				}
 				diffMatches := ScanDiff(lastHash, commitTree, result)
+				commitHash := c.Hash.String()
 				for _, match := range diffMatches {
-					match.Commit = c.Hash.String()
+					// Ensure Commit is always set for diff matches
+					match.Commit = commitHash
+					// Verify File is set (should be set in ScanDiff)
+					if match.File == "" && GetFlags().Debug {
+						fmt.Printf("[DEBUG] Warning: diff match has empty File field for commit %s\n", commitHash)
+					}
 					matchKey := fmt.Sprintf("%s|%s|%s|%s", match.Text, match.File, match.Line.Text, match.Commit)
 					if !matchMap[matchKey] {
 						matchMap[matchKey] = true
@@ -373,7 +397,20 @@ func processFile(file string, result RepoSearchResult) []*Match {
 	// Always check file extensions first (regardless of content or size)
 	extStart := time.Now()
 	fileExtMatches := MatchFileExtensions(file, fileResult)
+	// Set File field and context for extension matches
+	relPath := getRelativeFilePath(file, result.Repo)
+	// Get first 3 lines once for all extension matches from this file
+	var firstLines string
+	if len(fileExtMatches) > 0 {
+		firstLines = getFirstNLines(file, 3)
+	}
 	for _, match := range fileExtMatches {
+		match.File = relPath
+		match.CommitFile = relPath
+
+		// Set context to first 3 lines of the file for extension matches
+		match.Line.Text = firstLines
+
 		newMatches = append(newMatches, match)
 		score += 5
 	}
@@ -390,7 +427,7 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		// Return extension matches if any, otherwise nil
 		if score > 0 {
 			for _, match := range newMatches {
-				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				relPath := getRelativeFilePath(file, result.Repo)
 				match.CommitFile = relPath
 				match.File = relPath
 			}
@@ -416,7 +453,7 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		// Return extension matches if any, otherwise nil
 		if score > 0 {
 			for _, match := range newMatches {
-				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				relPath := getRelativeFilePath(file, result.Repo)
 				match.CommitFile = relPath
 				match.File = relPath
 			}
@@ -434,7 +471,7 @@ func processFile(file string, result RepoSearchResult) []*Match {
 		// Return extension matches if any, otherwise nil
 		if score > 0 {
 			for _, match := range newMatches {
-				relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
+				relPath := getRelativeFilePath(file, result.Repo)
 				match.CommitFile = relPath
 				match.File = relPath
 			}
@@ -458,6 +495,12 @@ func processFile(file string, result RepoSearchResult) []*Match {
 			searchMatches, searchScore := GetMatchesForString(content, result, true)
 			score += searchScore
 			if searchScore > -1 {
+				// Set File field immediately for all matches from this file
+				relPath := getRelativeFilePath(file, result.Repo)
+				for _, match := range searchMatches {
+					match.File = relPath
+					match.CommitFile = relPath
+				}
 				newMatches = append(newMatches, searchMatches...)
 			}
 			if GetFlags().Debug {
@@ -471,15 +514,59 @@ func processFile(file string, result RepoSearchResult) []*Match {
 	}
 
 	if score > 1 {
+		// Ensure all matches have File set (for extension matches that were added earlier)
+		relPath := getRelativeFilePath(file, result.Repo)
 		for _, match := range newMatches {
-			relPath := strings.Join(strings.Split(file[len("/tmp/githound/"):], "/")[2:], "/")
-			match.CommitFile = relPath
-			match.File = relPath
+			// Only set if not already set (extension matches should already have it)
+			if match.File == "" {
+				match.File = relPath
+				match.CommitFile = relPath
+			}
 		}
 		return newMatches
 	}
 
 	return nil
+}
+
+// getRelativeFilePath extracts the relative file path from the full file path
+// by removing the /tmp/githound/{repo}/ prefix
+func getRelativeFilePath(fullPath string, repo string) string {
+	prefix := "/tmp/githound/" + repo + "/"
+	if strings.HasPrefix(fullPath, prefix) {
+		return fullPath[len(prefix):]
+	}
+	// Fallback to old method if prefix doesn't match
+	parts := strings.Split(fullPath[len("/tmp/githound/"):], "/")
+	if len(parts) >= 2 {
+		return strings.Join(parts[2:], "/")
+	}
+	// Last resort: return just the filename
+	return filepath.Base(fullPath)
+}
+
+// getFirstNLines reads the first N lines from a file and returns them as a single string
+func getFirstNLines(filePath string, n int) string {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return ""
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	lineCount := 0
+
+	for scanner.Scan() && lineCount < n {
+		lines = append(lines, scanner.Text())
+		lineCount++
+	}
+
+	if err := scanner.Err(); err != nil {
+		return ""
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // readFileStreamingChunked reads a file in chunks with overlap to avoid missing matches at chunk boundaries
@@ -672,15 +759,51 @@ func ScanDiff(from *object.Tree, to *object.Tree, result RepoSearchResult) (matc
 		if err != nil {
 			log.Fatal(err)
 		}
-		matches, _ = GetMatchesForString(patchStr, result, true)
-		for _, diffFile := range diffData.Files {
-			fileExtMatches := MatchFileExtensions(diffFile.NewName, result)
-			// Convert pointer matches to value matches before appending
-			for _, ptrMatch := range fileExtMatches {
-				matches = append(matches, ptrMatch)
+
+		// Each change represents one file, so get the file name from the diff
+		// Use the first file (should typically be only one per change)
+		var fileName string
+		if len(diffData.Files) > 0 {
+			diffFile := diffData.Files[0]
+			fileName = diffFile.NewName
+			// If NewName is empty (file was deleted), try to get from the change itself
+			if fileName == "" {
+				// Try to extract from patch header or use a fallback
+				if GetFlags().Debug {
+					fmt.Printf("[DEBUG] Warning: diff file has empty NewName, may be a deleted file\n")
+				}
 			}
-			// Don't forget to return the matches to the pool
-			PutMatches(fileExtMatches)
+		}
+
+		// Scan the patch for matches
+		diffMatches, _ := GetMatchesForString(patchStr, result, true)
+		// Set File field on all matches from this diff - ensure it's always set
+		for _, match := range diffMatches {
+			if fileName != "" {
+				match.File = fileName
+				match.CommitFile = fileName
+			} else {
+				// If fileName is empty, try to extract from patch or use fallback
+				// This should rarely happen, but ensure File is set
+				if GetFlags().Debug {
+					fmt.Printf("[DEBUG] Warning: Setting empty File for diff match, patch may be malformed\n")
+				}
+				// File will remain empty, which will trigger fallback in GetDigFilesURL
+			}
+		}
+		matches = append(matches, diffMatches...)
+
+		// Process file extension matches for all files in the diff
+		for _, diffFile := range diffData.Files {
+			if diffFile.NewName != "" {
+				fileExtMatches := MatchFileExtensions(diffFile.NewName, result)
+				// Convert pointer matches to value matches before appending
+				for _, ptrMatch := range fileExtMatches {
+					matches = append(matches, ptrMatch)
+				}
+				// Don't forget to return the matches to the pool
+				PutMatches(fileExtMatches)
+			}
 		}
 	}
 	return matches
@@ -691,6 +814,10 @@ func DirSize(path string) (int64, error) {
 	var size int64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
+			// If the file/directory doesn't exist (e.g., deleted during walk), skip it
+			if os.IsNotExist(err) {
+				return nil
+			}
 			return err
 		}
 		if !info.IsDir() {
